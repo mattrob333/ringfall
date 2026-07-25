@@ -163,14 +163,17 @@ puts the shield break mid-burst and destroys the cadence.
 | `Vector BR` | CDF | 8.0 / 20.0 (2.5×) | KINETIC | 3-rnd burst, 400 ms refire, 60 ms intra | 36 | 108 | 2× | 4 bursts ⇒ **1.32 s** |
 | `Longbow` | CDF | 80 / 240 (3×) | KINETIC | 40 (1.5 s refire) | 4 | 16 | 2× / 8× | 1 headshot, or 2 body ⇒ 1.50 s |
 | `Breaker` | CDF | 12 pellets × 11 | KINETIC | 70 (0.85 s) | 6 tube | 24 | none | 1 shot ≤ 2.2 m ⇒ **0.00 s** |
-| `Ember Repeater` | Vess | 6.0 (no head bonus) | PLASMA | 450 | heat | — | none | 8 + 14 rounds ⇒ **2.93 s** |
+| `Ember Repeater` | Vess | 6.0 (no head bonus) | PLASMA | 450 | heat | — | none | 8 + 14 rounds ⇒ **2.80 s** |
 | `Vess Sidearm` | Vess | 8.0 / uncharged | PLASMA | 300 | battery 100 | — | none | see 4.3 |
 | `Vess Sidearm` (charged) | Vess | 25 EMP | EMP | 1.2 s charge | 12 battery | — | none | strips 70 shields in **1 bolt** |
 
 Derived, with the `ARCHITECTURE.md` §5.3 matrix applied:
 
-* `Ember Repeater` vs shields: 6.0 × 1.60 = 9.6 ⇒ ⌈70/9.6⌉ = **8 rounds (1.07 s)** to strip.
-  vs health: 6.0 × 0.55 = 3.3 ⇒ ⌈45/3.3⌉ = 14 rounds (1.87 s). Total 2.93 s.
+* `Ember Repeater` vs shields: 6.0 × 1.60 = 9.6 ⇒ ⌈70/9.6⌉ = **8 rounds** to strip.
+  vs health: 6.0 × 0.55 = 3.3 ⇒ ⌈45/3.3⌉ = 14 rounds. Total **22 rounds**, and
+  first round to last is **21** intervals at 60/450 = 0.1333 s ⇒ **2.80 s**.
+  *(v1.0 said 2.93 s, which multiplied 22 × 0.1333 — one interval too many. TTK
+  is measured first-round-to-last, exactly as the `Vector BR` figure above is.)*
 * `Cadence AR` vs shields: 5.0 ⇒ 14 rounds (1.40 s) to strip.
 * So plasma strips **31% faster** and finishes **69% slower**. That asymmetry is the reason the
   player carries one of each, and it must survive every tuning pass.
@@ -229,8 +232,18 @@ reload and no ammo pickup; a Vess weapon is a resource you spend and discard.
 | Trail | dark smoke + a single blinking indicator light, readable against sky | continuous cyan plasma ribbon, readable against ground |
 
 A frag at 0 m deals 90 < 115 effective HP: **grenades never delete a healthy player**. They kill
-an unshielded player out to 2.7 m. That is the correct role — grenades open a window, they do not
-close a fight on their own.
+an unshielded player out to **2.23 m**:
+
+```
+damage(d) = 90 · (1 − d/5.5)^1.6 · 1.15      (EXPLOSIVE is ×1.15 vs health)
+45 = 103.5 · (1 − d/5.5)^1.6   ⇒   d = 5.5 · (1 − 0.4348^(1/1.6)) = 2.232 m
+```
+
+*(v1.0 said 2.7 m. That number came from a LINEAR falloff and omitted the ×1.15
+`EXPLOSIVE` multiplier, contradicting the exponent 1.6 in the table directly
+above it. The implementation was correct and the spec was wrong.)*
+
+That is the correct role — grenades open a window, they do not close a fight on their own.
 
 Apex of a level throw from eye height: v₀ᵧ = 17.0 sin 6° = 1.78 m/s ⇒ rise 0.170 m above the
 release point, reached at 0.191 s. Flat, fast, throwable on instinct.

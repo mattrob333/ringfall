@@ -367,17 +367,14 @@ export class Vehicle {
       const compressionVel = -_contactVel.dot(_up);
       let fs = RIDGEBACK.springK * compression + RIDGEBACK.damperC * compressionVel;
       if (fs < 0) fs = 0;
-      // COMPENSATION: this does NOT de-rate suspension force by the hit surface normal (e.g. to
-      // soften standing on a steep slope), even though that would be the more physically correct
-      // behaviour. `physics.raycast`'s returned `hit.normal` is wrong for a subset of straight-
-      // down suspension rays — reproducibly returns a side-face normal instead of the true
-      // top-face normal once the ray origin's XZ offset from the struck box's centre exceeds
-      // roughly 1.0 (independent of box size; verified against `rayObb` directly, see DEFECTS.md
-      // "VEH1"). All four Ridgeback wheel mounts sit further than that from a level-sized ground
-      // box's centre, so trusting `hit.normal.y` here made every wheel's suspension force ~30%
-      // of its correct value and the vehicle sank through the floor. Suspension force is applied
-      // along the vehicle's own local up axis regardless (which is correct on flat/gently-sloped
-      // ground; slope de-rating is simply not implemented until DEFECTS.md "VEH1" is fixed).
+      // COMPENSATION REMOVED (DEFECTS.md VEH1-C, closed). The upstream cause —
+      // rayObb picking the wrong face on an anisotropic box — is fixed in
+      // src/physics/geometry.js, so hit.normal is now trustworthy. Suspension
+      // force is still applied along the vehicle's own local up axis, which is
+      // a deliberate modelling choice rather than a workaround: de-rating by
+      // the ground normal makes the chassis slide on the gentle terrain slopes
+      // this level is built from. Slope de-rating remains unimplemented and is
+      // recorded as a limitation in this directory's README, not as a defect.
       _forceVec.copy(_up).multiplyScalar(fs);
       _forceAccum.add(_forceVec);
       _torqueContrib.crossVectors(_r, _forceVec);

@@ -21,16 +21,18 @@
 //   3. Pairwise IoU at 256 (A3, threshold 0.60) and at 64 (A5, threshold 0.68).
 //   4. Aspect ratio w/h per archetype, spread checked against A4 (>= 0.55).
 //
-// A1 NOTE — a genuine inconsistency in the spec, not in this code.
+// A1 NOTE
 //   §8 fixes the framing at 60 m, 1080p, vFOV 55.4°, which is
 //       1080 / (2 * 60 * tan(27.7°)) = 17.14 px/m.
-//   §5 fixes SKIRN's height at 1.42 m. 1.42 * 17.14 = 24.3 px, so SKIRN's mask
-//   CANNOT be 30 px tall at that framing no matter how it is modelled. A1 is
-//   unsatisfiable for SKIRN as long as both numbers stand. It is measured and
-//   reported here rather than quietly dropped, and filed in DEFECTS.md.
+//   §5 fixes SKIRN's height at 1.42 m, so SKIRN's mask can only ever be
+//   1.42 * 17.14 = 24.3 px tall. The original A1 floor of 30 px / 250 px was
+//   therefore unreachable for SKIRN at ANY modelling quality. This file left
+//   the gate FAILING and reported the arithmetic rather than relaxing it; the
+//   orchestrator then corrected §8 to 22 px / 170 px in ART.md amendment A1.
+//   The GATE table below carries the amended values.
 //
-// Nothing in this file relaxes a threshold. A3/A4/A5 are used exactly as
-// written.
+// A3, A4 and A5 are used exactly as written and were never relaxed. Every
+// change made to hit them was a change to the geometry.
 
 import * as THREE from 'three';
 import { LAYER_TRANSPARENT } from '../render/index.js';
@@ -338,9 +340,9 @@ export function runCharacterSelfTest(opts = {}) {
 
   if (results.some((r) => !r.a1)) {
     notes.push(
-      'A1 is unsatisfiable for SKIRN under the stated §8 framing: 17.14 px/m at 60 m x 1.42 m ' +
-        '= 24.3 px, below the 30 px minimum. This is an ART.md §5 vs §8 arithmetic conflict, ' +
-        'not a modelling defect. Filed in DEFECTS.md (CHAR1).',
+      'A1 measures the real §8 framing (17.14 px/m at 60 m). The ceiling per archetype is ' +
+        'SKIRN 24.3 px, CULL 30.5 px, VANE 40.1 px, WARDEN 48.9 px — those are set by ' +
+        'FEEL.md §6 heights and cannot be modelled around. Thresholds are ART.md amendment A1.',
     );
   }
 

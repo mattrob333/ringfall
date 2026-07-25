@@ -28,7 +28,7 @@
 //             widest point is also its highest point.
 //
 // Materials come from src/materials (frozen, ART.md §3.3 Vess palette). This
-// file writes no shader code. The one non-obvious trick is `emissiveMat()`:
+// file writes no shader code. The one non-obvious trick is `createEmissiveMaterial()`:
 // setting `patternScale: 0, patternRotation: 0` on Family.VESS collapses the
 // analytic seam mask to a constant 1.0, which turns the shipped Vess shader
 // into a uniform emissive surface. That is how glow panels, tank cores, plasma
@@ -111,7 +111,7 @@ let _mats = null;
  * gives a flat emissive panel out of the shipped material library with no new
  * shader and no new material family.
  */
-function emissiveMat(colorHex, intensity, opts = {}) {
+export function createEmissiveMaterial(colorHex, intensity, opts = {}) {
   return createMaterial(Family.VESS, {
     baseColor: '#0E1016',
     accentColor: '#141824',
@@ -172,11 +172,19 @@ function materials() {
       emissiveSeams: 0.0,
       surfaceId: SurfaceId.FLESH,
     }),
-    glowCyan: emissiveMat(VESS.plasmaCyan, 2.6),
-    glowViolet: emissiveMat(VESS.plasmaViolet, 2.4),
+    // ART.md §3.3: emissive must run 3-8x the linear luminance of the adjacent
+    // diffuse. A sunlit Vess shell sits near 0.27 linear.
+    //   cyan   #57E0FF  lum 0.626 x 2.6 = 1.63  -> 6.0x   (post-exposure 1.48)
+    //   violet #B36BFF  lum 0.283 x 3.2 = 0.91  -> 3.4x   (post-exposure 0.82)
+    //   tank   #FFB454  lum 0.542 x 3.4 = 1.84  -> 6.8x   (post-exposure 1.68)
+    // Violet is held at 3.2 rather than 2.6 because 2.6 lands at 2.5x, under
+    // the 3x floor; and well under the 1.22 post-exposure violet ceiling
+    // recorded in ART.md amendment A2 / DEFECTS.md ART3.
+    glowCyan: createEmissiveMaterial(VESS.plasmaCyan, 2.6),
+    glowViolet: createEmissiveMaterial(VESS.plasmaViolet, 3.2),
     // SKIRN methane tank: hot, and a ×3 WEAKPOINT, so it is the brightest thing
     // on the model. It must be the first thing the eye lands on.
-    glowTank: emissiveMat('#FFB454', 3.4),
+    glowTank: createEmissiveMaterial('#FFB454', 3.4),
   };
   return _mats;
 }
@@ -351,8 +359,8 @@ function buildSkirn(kit, root, parts, hitboxes) {
   const tanks = kit.group(torso, [0, 0, 0], null, 'tanks');
   parts.tanks = tanks;
   for (const s of [1, -1]) {
-    kit.cyl(tanks, M.shellDeep, [0.30 * s, 0.52, -0.18], 0.115, 0.115, 0.40, null, 8);
-    kit.cyl(tanks, M.glowTank, [0.30 * s, 0.52, -0.18], 0.088, 0.088, 0.43, null, 8);
+    kit.cyl(tanks, M.shellDeep, [0.30 * s, 0.494, -0.18], 0.115, 0.115, 0.40, null, 8);
+    kit.cyl(tanks, M.glowTank, [0.30 * s, 0.494, -0.18], 0.088, 0.088, 0.43, null, 8);
     kit.cyl(tanks, M.shellDeep, [0.135 * s, 0.468, -0.26], 0.10, 0.10, 0.40, null, 8);
     kit.cyl(tanks, M.glowTank, [0.135 * s, 0.468, -0.26], 0.074, 0.074, 0.43, null, 8);
   }
@@ -625,8 +633,8 @@ function buildVane(kit, root, parts, hitboxes) {
   kit.box(head, M.shellDeep, [0, 0.09, 0.02], [0.185, 0.07, 0.28]);
   kit.box(head, M.glowViolet, [0, -0.02, 0.14], [0.10, 0.10, 0.025]);
   for (const s of [1, -1]) {
-    kit.box(head, M.shellLight, [0.055 * s, 0.303, -0.02], [0.045, 0.38, 0.11], [0, 0, -0.06 * s]);
-    kit.box(head, M.glowCyan, [0.055 * s, 0.34, 0.03], [0.02, 0.22, 0.02]);
+    kit.box(head, M.shellLight, [0.055 * s, 0.299, -0.02], [0.045, 0.38, 0.11], [0, 0, -0.06 * s]);
+    kit.box(head, M.glowCyan, [0.055 * s, 0.336, 0.03], [0.02, 0.22, 0.02]);
   }
   hitbox(hitboxes, head, {
     name: 'head',
@@ -674,7 +682,7 @@ function buildVane(kit, root, parts, hitboxes) {
   // FrontSide halves it and 0.34 leaves the resting shell just under the bloom
   // threshold, so it reads as a translucent sheen and only blooms when the
   // hit flash spikes it — which is the behaviour FEEL.md §7 actually asks for.
-  const shieldMat = emissiveMat(VESS.plasmaCyan, 0.34, {
+  const shieldMat = createEmissiveMaterial(VESS.plasmaCyan, 0.34, {
     side: THREE.FrontSide,
     baseColor: '#1A2E4A',
     accentColor: '#1A2E4A',
@@ -1102,8 +1110,10 @@ function applyShieldUniforms(handle) {
   const flash = clamp(a.shieldFlash, 0, 1);
   sh.group.visible = f > 0.001 || flash > 0.001;
   // Base glow tracks remaining shield; a hit adds a 4x flare that decays at
-  // 4/s. 1.9 base -> 9.5 at full flare, which is well over the post-exposure
-  // bloom threshold of 1.0 (ART.md §7.2) so the flare blooms hard and wide.
+  // 4/s. Base intensity is set where the shell is built (currently 0.34, tuned
+  // against a real palette.mjs measurement rather than from the emissive-ratio
+  // arithmetic), so a full flare reaches 5x that and crosses the post-exposure
+  // bloom threshold of 1.0 (ART.md §7.2) while the resting shell does not.
   const intensity = sh.baseIntensity * (0.35 + 0.65 * f) * (1 + 4.0 * flash);
   sh.material.uniforms.uEmissiveIntensity.value = intensity;
   const s = 1 + 0.05 * flash;

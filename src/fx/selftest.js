@@ -327,7 +327,7 @@ export function runFxSelfTest({ frames = 600, burst = 400, verbose = false } = {
       perEvent = `${((a2 - b2) / 20000).toFixed(1)} bytes/impact`;
 
       fx3.dispose();
-      results.push({ name: 'garbage per surface.impact (informational)', ok: true, measured: perEvent, expected: 'reported, not gated' });
+      push('garbage per surface.impact (informational)', true, perEvent, 'reported, not gated');
     }
     push('update() allocates nothing per frame', ok, measured, '< 256 bytes/frame');
   }

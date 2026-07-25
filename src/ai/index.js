@@ -203,16 +203,7 @@ export class AiDirector {
   _onDamageApplied(p) {
     const agent = this._agentIndex.get(p.targetId);
     if (!agent) return;
-    agent.applyDamage({
-      amount: p.rawAmount ?? p.amount,
-      damageType: p.damageType,
-      hitRegion: p.hitRegion,
-      sourceId: p.sourceId,
-      weaponId: p.weaponId,
-      point: p.point,
-      normal: p.normal,
-      headMult: p.headMult,
-    });
+    agent.onExternalDamageApplied(p);
   }
 
   /** Direct entry point for the weapons owner (no event round-trip). */

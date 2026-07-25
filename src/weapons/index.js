@@ -615,10 +615,18 @@ export class WeaponSystem {
       }
       case FireMode.BURST: {
         if (!this._burstActive && held && this._time >= this._nextFireTime) {
+          // Anchor on the SCHEDULED burst time, not the tick we noticed it.
+          // Anchoring on `_time` re-quantises every burst and the error
+          // compounds: measured 1.3417 s for a 4-burst kill instead of
+          // 1.3250 s (FEEL.md F19 target 1.32 s).
+          const scheduled =
+            this._nextFireTime > -1e8 && this._nextFireTime <= this._time
+              ? this._nextFireTime
+              : this._time;
           this._burstActive = true;
-          this._burstAnchor = this._time;
+          this._burstAnchor = scheduled;
           this._burstFired = 0;
-          this._nextFireTime = this._time + def.refire;
+          this._nextFireTime = scheduled + def.refire;
         }
         if (this._burstActive) {
           while (
@@ -655,7 +663,9 @@ export class WeaponSystem {
         this.bus.emit(Ev.WEAPON_CHARGE_START, _pCharge);
       }
       this._charge += dt;
-      if (!this.chargeFull && this._charge >= def.chargeTime) {
+      // 1e-9 slack: `_charge` is an accumulation of 144 x 1/120 and lands on
+      // 1.1999999999999997 as often as 1.2000000000000002.
+      if (!this.chargeFull && this._charge >= def.chargeTime - 1e-9) {
         this.chargeFull = true;
         _pCharge.ownerId = this.ownerId;
         _pCharge.weaponId = slot.id;
@@ -1500,6 +1510,16 @@ export class WeaponSystem {
     _hitPoint.set(cap.position.x, cap.position.y + cap.height * 0.5, cap.position.z);
     _hitNormal.set(-fnx, 0, -fnz);
 
+    // melee.landed is emitted BEFORE the damage chain so a consumer sees
+    // landed -> damage.applied -> entity.killed in causal order.
+    _pMeleeLanded.ownerId = this.ownerId;
+    _pMeleeLanded.targetId = best.entityId;
+    _pMeleeLanded.fromBehind = fromBehind;
+    _pMeleeLanded.point[0] = _hitPoint.x;
+    _pMeleeLanded.point[1] = _hitPoint.y;
+    _pMeleeLanded.point[2] = _hitPoint.z;
+    this.bus.emit(Ev.MELEE_LANDED, _pMeleeLanded);
+
     let killed = false;
     if (fromBehind) {
       // Assassination — unconditional. Routed through resolveDamage with a
@@ -1520,14 +1540,6 @@ export class WeaponSystem {
       );
       killed = !!(res && res.killed);
     }
-
-    _pMeleeLanded.ownerId = this.ownerId;
-    _pMeleeLanded.targetId = best.entityId;
-    _pMeleeLanded.fromBehind = fromBehind;
-    _pMeleeLanded.point[0] = _hitPoint.x;
-    _pMeleeLanded.point[1] = _hitPoint.y;
-    _pMeleeLanded.point[2] = _hitPoint.z;
-    this.bus.emit(Ev.MELEE_LANDED, _pMeleeLanded);
     return killed;
   }
 }

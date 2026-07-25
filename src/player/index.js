@@ -310,6 +310,12 @@ export class PlayerController {
       this._jumpBuffer = 0;
       this._coyote = 0;
       this.grounded = false;
+      // CharacterBody.move() ground-snaps whenever it *was* grounded last
+      // tick (src/physics/README.md "Ground snap"). Without clearing the flag
+      // the snap yanks the capsule straight back onto the floor on the launch
+      // tick and the jump never leaves the ground — measured apex 0.001 m,
+      // airtime 0.017 s before this line existed.
+      this.body.grounded = false;
       jumped = true;
       _pJump.entityId = this.entityId;
       this.bus.emit(Ev.PLAYER_JUMPED, _pJump);

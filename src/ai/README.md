@@ -154,6 +154,36 @@ belongs to `weapons`/`vehicles`/`game` per ARCHITECTURE.md §4.1, and emitting
 it here would double-fire when the event path is used. The director subscribes
 to `damage.applied` and uses `rawAmount ?? amount` as the pre-mitigation input.
 
+### The two-resolver problem (`// COMPENSATION:`, DEFECTS.md AI4 / AI4-C)
+
+`src/weapons` is **also** a damage resolver: `WeaponSystem._damageTarget()`
+calls `resolveDamage()`, writes `state.shield`/`state.health`/`state.dead`
+straight into the registered target record, and emits the same four events this
+module emits. Because the registered `state` **is** the `AiAgent`, that write
+bypasses the CULL barrier and WARDEN plates — mitigation no other module can
+compute, since only `src/ai` knows `barrierYaw` / `barrierHealth`.
+
+Measured with the real `WeaponSystem` wired through the real `TargetRegistry`,
+player firing `Vector BR` into a CULL's **front** arc at 15 m: health went
+**55 → 0** and `entity.killed` fired, where F48 requires **0** damage.
+
+`AiAgent.onExternalDamageApplied()` compensates: it keeps an authoritative
+`_authShield`/`_authHealth` snapshot of everything *this* module last wrote, and
+if the live values disagree it restores them and re-resolves the raw amount
+properly. `dead` is exposed as an accessor over `alive` so the registry and the
+weapon system see a consistent corpse — without it a dead agent reported
+`dead === undefined` and `TargetRegistry.isValidTarget()` kept returning true.
+
+After the compensation the same test gives the F48-correct result: the barrier
+absorbs rounds 1–12 with health untouched at 55, then the 13th round deals its
+full 8 → health 47, barrier 0.
+
+**This is a workaround, not a fix.** It cannot suppress events the weapon
+system already emitted, so `entity.killed` still double-fires (measured 2×
+over a 5 s burst). It needs a single-resolver decision from the orchestrator —
+see DEFECTS.md AI4 for the two proposed shapes. Delete
+`onExternalDamageApplied`'s restore branch the moment there is one resolver.
+
 ## Accuracy model — FEEL.md §6
 
 The decision is baked into the **fired direction**, not into a flag. A "miss"
@@ -333,8 +363,8 @@ as-is.
 
 ## Self-test results (measured, not predicted)
 
-`node` 24.13.0, `three` 0.185.1, `runAiSelfTest()`. **26 / 26 pass, 0 fail**,
-~0.30 s.
+`node` 24.13.0, `three` 0.185.1, `runAiSelfTest()`. **28 / 28 pass, 0 fail**,
+~0.29 s.
 
 | Assertion | Measured | Expected |
 | --- | --- | --- |
@@ -353,6 +383,8 @@ as-is.
 | CULL barrier lag vs a 4.40 m/s orbit at 12 m | 0.000° | ≤ 31° |
 | WARDEN front plate | 14 (40 × 0.35) | 14 |
 | WARDEN back weakpoint | 120 (40 × 3) | 120 |
+| **AI4: external resolver cannot bypass the CULL barrier** | **health 55, barrier 82** after a bypassing write set health to 47 | health 55 |
+| AI4: `dead` accessor consistent with `alive` | `alive=true dead=false` | consistent |
 | F49 90 KINETIC strips shield, no health bleed | shield 0, health 60 | shield 0, health 60 |
 | **F49 shield recharge delay** | **4.0083 s** | 4.00 ± 0.10 |
 | **F49 shield 0 → 90 duration** | **3.0000 s** | 3.00 ± 0.10 |
@@ -395,4 +427,6 @@ Run as throwaway harnesses during development, not committed:
 See `DEFECTS.md` rows **AI1** (AI-local constants that may belong in
 `tuning.js`), **AI2** (`damage.applied` has no attacker world position, which
 directional mitigation needs), **AI3** (no frozen event for the CULL barrier
-breaking, so `fx` cannot play the ricochet/shatter).
+breaking, so `fx` cannot play the ricochet/shatter), and **AI4 / AI4-C**
+(`src/weapons` is a second damage resolver — the open compensation described
+above, and a hard F48 failure without it).

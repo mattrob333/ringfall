@@ -184,9 +184,12 @@ export function runPlayerSelfTest() {
     let apex = p.body.position.y;
     let steps = 1;
     let airSteps = -1;
+    let gMeasured = 0;
     while (steps < 400) {
+      const vBefore = p.velocity.y;
       p.update(SIM_DT, jump);
       clearPressed(jump);
+      if (steps === 20) gMeasured = (vBefore - p.velocity.y) / SIM_DT;
       steps++;
       if (p.body.position.y > apex) apex = p.body.position.y;
       if (p.grounded) {
@@ -200,7 +203,10 @@ export function runPlayerSelfTest() {
     push('F08', 'Jump total airtime, flat ground', near(t, 0.95, 0.02), t, 0.95, 0.02);
     metrics.apex = h;
     metrics.airtime = t;
-    metrics.playerGravity = (8 * h) / (t * t);
+    // Direct measurement: the per-tick vertical velocity delta in free flight.
+    metrics.playerGravity = gMeasured;
+    // Independent cross-check from the arc itself (FEEL.md §2.1 g = 8h/t²).
+    metrics.playerGravityFromArc = (8 * h) / (t * t);
   }
 
   // ---- F09 air accel / ground accel -------------------------------------

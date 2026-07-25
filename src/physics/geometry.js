@@ -175,12 +175,26 @@ export function rayObb(origin, dir, box, maxDist, out) {
   if (tmin > maxDist || tmax < 0) return null;
   const t = tmin;
   _lh.set(o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t);
-  // Face = local axis whose |component| lands closest to its half-extent.
+  // Face = the local axis on which the hit point is NORMALISED-closest to its
+  // half-extent. The comparison must be scale-free.
+  //
+  // The previous score, h[i] - | |comp[i]| - h[i] |, added the half-extent's
+  // MAGNITUDE to the score, so on an anisotropic box the longest axis won even
+  // when the ray struck a different face. On a 34 x 5 x 0.6 m wall a hit on the
+  // thin z face scored 0.3 while the x axis scored 5, and the returned normal
+  // pointed along the wall instead of out of it. Point and distance were always
+  // correct; only the normal was wrong, which is why it survived a raycast test
+  // that checked the hit position.
+  //
+  // Found by the `vehicles` owner: every Ridgeback wheel was reading a bad
+  // ground normal, cutting suspension force to ~30% and sinking the chassis
+  // through the floor (DEFECTS.md VEH1). It also affects character ground
+  // classification, impact decal orientation and ricochet direction.
   let axis = 0,
     best = -Infinity;
   const comp = [_lh.x, _lh.y, _lh.z];
   for (let i = 0; i < 3; i++) {
-    const score = h[i] - Math.abs(Math.abs(comp[i]) - h[i]);
+    const score = Math.abs(comp[i]) / Math.max(h[i], 1e-9);
     if (score > best) {
       best = score;
       axis = i;

@@ -36,6 +36,12 @@ export class RingfallRenderer {
       preserveDrawingBuffer: true, // required by tools/baseline.mjs readback
     });
     this.renderer.autoClear = false;
+    // info.autoReset defaults to true, which zeroes the counters at the START
+    // of every render() call. A frame issues ~10 render() calls (4 shadow
+    // cascades, prepass, opaque, sky, view model, transparent, then the post
+    // chain), so the reported draw count was only ever the LAST one — measured
+    // as "draws 1, tris 1" in playtest. We reset once per frame instead.
+    this.renderer.info.autoReset = false;
     // The composite pass encodes sRGB itself, so the renderer must NOT convert
     // again. LinearSRGBColorSpace is the pass-through setting; NoColorSpace is
     // not a legal value here in r185.
@@ -149,6 +155,7 @@ export class RingfallRenderer {
     const g = this.globals;
     const programsBefore = r.info.programs?.length ?? 0;
 
+    r.info.reset();
     g.u.uTime.value = time;
     g.setCamera(camera);
     camera.updateMatrixWorld();
@@ -246,7 +253,6 @@ export class RingfallRenderer {
     this.stats.programs = programsAfter;
     this.stats.drawCalls = r.info.render.calls;
     this.stats.triangles = r.info.render.triangles;
-    r.info.reset();
   }
 
   dispose() {

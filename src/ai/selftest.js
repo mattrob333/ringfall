@@ -14,6 +14,7 @@ import { resetIds } from '../core/ids.js';
 import { SurfaceId, DamageType, HitRegion, Faction, Archetype } from '../shared/enums.js';
 import { Ev } from '../shared/events.js';
 import { SIM_DT, ENEMY, PLAYER, AI } from '../shared/tuning.js';
+import { resolveDamage } from '../shared/damage.js';
 import { AiDirector } from './index.js';
 import { AiState } from './constants.js';
 
@@ -371,6 +372,54 @@ export function runAiSelfTest() {
       Math.abs(backApplied - 120) < 1e-9,
       +backApplied.toFixed(6),
       120,
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // 2d. The two-resolver compensation (DEFECTS.md AI4). Simulates exactly what
+  //     `WeaponSystem._damageTarget()` does — resolveDamage() into our state,
+  //     then emit `damage.applied` — and requires the CULL barrier to survive
+  //     it. Also checks `dead` stays consistent with `alive`.
+  // -----------------------------------------------------------------------
+  {
+    const { events, director } = fresh(2029);
+    const cull = director.spawn({ archetype: Archetype.CULL, position: new Vector3(0, 0, 0), squadId: 'c3', faction: Faction.VESS });
+    const player = makePlayer(0, 0, 15);
+    for (let i = 0; i < 120; i++) director.update(SIM_DT, player);
+
+    const deadMatchesAlive = cull.dead === !cull.alive;
+
+    // Exactly the upstream sequence: external resolver writes state, then emits.
+    const raw = 8.0; // Vector BR body
+    const s = { shield: cull.shield, health: cull.health };
+    const res = resolveDamage(s, raw, DamageType.KINETIC, HitRegion.TORSO, 1.0);
+    cull.shield = res.shield;
+    cull.health = res.health; // the bypassing write
+    events.emit(Ev.DAMAGE_APPLIED, {
+      targetId: cull.entityId,
+      sourceId: player.entityId,
+      amount: res.applied,
+      rawAmount: raw,
+      damageType: DamageType.KINETIC,
+      hitRegion: HitRegion.TORSO,
+      point: [player.position.x, player.position.y + 1.0, player.position.z],
+      normal: [0, 0, 1],
+      weaponId: 'vector_br',
+      absorbedByShield: res.absorbedByShield,
+    });
+
+    push(
+      'AI4 compensation: an external resolver cannot bypass the CULL barrier',
+      cull.health === ENEMY.CULL.health,
+      `health ${cull.health}, barrier ${cull.barrierHealth}`,
+      `health ${ENEMY.CULL.health}, barrier ${ENEMY.CULL.barrierHealth - raw}`,
+      'the external write set health to 47; the compensation restored it and re-resolved with the barrier',
+    );
+    push(
+      'AI4: `dead` accessor stays consistent with `alive`',
+      deadMatchesAlive && cull.dead === false && cull.alive === true,
+      `alive=${cull.alive} dead=${cull.dead}`,
+      'alive=true dead=false',
     );
   }
 

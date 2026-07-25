@@ -123,6 +123,14 @@ export class AiAgent {
     this.shield = tuning.shield;
     this.health = tuning.health;
     this.alive = true;
+    /**
+     * The last shield/health/alive values THIS module wrote. Used to detect an
+     * external damage resolver having written our state behind our back — see
+     * `onExternalDamageApplied` and DEFECTS.md AI4.
+     */
+    this._authShield = tuning.shield;
+    this._authHealth = tuning.health;
+    this._externalResolverSeen = false;
     this.shieldDelayTimer = 0;
     this.recharging = false;
     this.shieldRate = tuning.shield > 0 && tuning.shieldRechargeTime ? tuning.shield / tuning.shieldRechargeTime : 0;
@@ -240,6 +248,61 @@ export class AiAgent {
     return yawToForward(this.yaw, this._forward);
   }
 
+  /**
+   * `../weapons/targets.js` reads `state.dead` (and writes it on a kill), while
+   * this module's native flag is `alive`. Exposing `dead` as an accessor over
+   * `alive` keeps the two from drifting — without it a corpse reports
+   * `dead === undefined`, `TargetRegistry.isValidTarget()` returns true, and
+   * the weapon system keeps shooting it.
+   */
+  get dead() {
+    return !this.alive;
+  }
+
+  set dead(v) {
+    if (!v) return; // external "revive" is not a thing; ignore.
+    // Our two-layer state is authoritative. An external resolver that decided
+    // we died without knowing about the CULL barrier / WARDEN plates is
+    // overruled — see onExternalDamageApplied and DEFECTS.md AI4.
+    if (this.health > 0) return;
+    if (this.alive) this._die({}, HitRegion.TORSO, DamageType.KINETIC);
+  }
+
+  /**
+   * Handle a `damage.applied` that names this entity.
+   *
+   * COMPENSATION (DEFECTS.md AI4): `src/weapons` is ALSO a damage resolver —
+   * `WeaponSystem._damageTarget()` calls `resolveDamage()` and writes
+   * `state.shield`/`state.health` directly before emitting `damage.applied`.
+   * That write bypasses this module's archetype mitigation (the CULL forward
+   * arm barrier and the WARDEN front plates), which no other module can
+   * compute because only `src/ai` knows `barrierYaw`/`barrierHealth`. Measured:
+   * a CULL shot in the front arc with `Vector BR` went 55 -> 0 health and
+   * emitted `entity.killed`, where FEEL.md F48 requires 0 damage.
+   *
+   * So: if the state was written behind our back, restore our own authoritative
+   * snapshot first and re-resolve the RAW amount properly. Remove this the
+   * moment there is a single resolver.
+   */
+  onExternalDamageApplied(p) {
+    if (this.shield !== this._authShield || this.health !== this._authHealth) {
+      this._externalResolverSeen = true;
+      this.shield = this._authShield;
+      this.health = this._authHealth;
+      if (this._authHealth > 0) this.alive = true;
+    }
+    this.applyDamage({
+      amount: p.rawAmount ?? p.amount,
+      damageType: p.damageType,
+      hitRegion: p.hitRegion,
+      sourceId: p.sourceId,
+      weaponId: p.weaponId,
+      point: p.point,
+      normal: p.normal,
+      headMult: p.headMult,
+    });
+  }
+
   // -----------------------------------------------------------------------
   // Vocalization — ai.vocalize {entityId, archetype, cue}
   // -----------------------------------------------------------------------
@@ -352,6 +415,8 @@ export class AiAgent {
     const res = resolveDamage(before, amount, damageType, hitRegion, p.headMult ?? 1.0);
     this.shield = res.shield;
     this.health = res.health;
+    this._authShield = res.shield;
+    this._authHealth = res.health;
 
     // Any damage resets the recharge delay (FEEL.md §3, F14 semantics).
     if (this.maxShield > 0) {
@@ -1105,8 +1170,10 @@ export class AiAgent {
       return;
     }
     this.shield += this.shieldRate * dt;
+    this._authShield = this.shield;
     if (this.shield >= this.maxShield) {
       this.shield = this.maxShield;
+      this._authShield = this.shield;
       this.recharging = false;
       events.emit(Ev.SHIELD_RECHARGE_FULL, { entityId: this.entityId });
       events.emit(Ev.HEALTH_CHANGED, {
