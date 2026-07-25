@@ -1,0 +1,16 @@
+import * as THREE from 'three';
+const r = await import('./src/render/index.js');
+console.log('render ok', r.LAYER_WORLD, r.LAYER_VIEWMODEL, r.LAYER_TRANSPARENT);
+const m = await import('./src/materials/index.js');
+m.bindGlobals({ u: {} });
+const mat = m.Materials.vessShell();
+console.log('material ok', mat.type, Object.keys(mat.uniforms).length);
+const t = (g) => (g.index ? g.index.count / 3 : g.attributes.position.count / 3);
+console.log('box', t(new THREE.BoxGeometry(1,1,1)));
+console.log('cyl8', t(new THREE.CylinderGeometry(0.2,0.2,1,8,1)));
+console.log('cyl10', t(new THREE.CylinderGeometry(0.2,0.2,1,10,1)));
+console.log('sph12x8', t(new THREE.SphereGeometry(1,12,8)));
+console.log('sph10x6', t(new THREE.SphereGeometry(1,10,6)));
+console.log('ico1', t(new THREE.IcosahedronGeometry(1,1)));
+console.log('cap(3,8)', t(new THREE.CapsuleGeometry(0.3,0.6,3,8)));
+console.log('cone8', t(new THREE.ConeGeometry(0.3,0.6,8,1)));

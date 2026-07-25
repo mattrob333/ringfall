@@ -3,13 +3,17 @@
 
 import * as THREE from 'three';
 import { FULLSCREEN_VERT } from './fullscreen.js';
-import { CHUNK_COMMON, CHUNK_GLOBALS, CHUNK_SKY } from './chunks.js';
+import { CHUNK_COMMON, CHUNK_GLOBALS, CHUNK_SKY, CHUNK_SH } from './chunks.js';
+import { RING_GLSL, RING_RADIUS, RING_WIDTH } from './ring.js';
+import { hexToLinear, TERRAIN, WROUGHT } from '../shared/palette.js';
 
 const SKY_FRAG = /* glsl */ `
   precision highp float;
   ${CHUNK_COMMON}
   ${CHUNK_GLOBALS}
   ${CHUNK_SKY}
+  ${CHUNK_SH}
+  ${RING_GLSL}
 
   in vec2 vUv;
   layout(location = 0) out vec4 fragColor;
@@ -54,6 +58,10 @@ const SKY_FRAG = /* glsl */ `
 
     vec3 col = skyRadiance(dir);
 
+    // The ring sits behind the clouds and in front of the gradient.
+    vec4 ring = ringArc(dir, uCameraPos);
+    col = mix(col, ring.rgb, ring.a);
+
     // Clouds sit between the sky gradient and the sun, so the sun still burns
     // through their edges. Two layers at different heights give parallax.
     float c1 = cloudLayer(dir, 1.0,  0.55, vec2(uTime * 0.0016, uTime * 0.0009), 1.0 - uCloudCoverage);
@@ -84,6 +92,12 @@ export class SkyDome {
       uCloudCoverage: { value: 0.42 },
       uCloudDensity: { value: 0.72 },
       uCloudTint: { value: new THREE.Vector3(1.02, 1.0, 0.97) },
+      uRingRadius: { value: RING_RADIUS },
+      uRingWidth: { value: RING_WIDTH },
+      uRingLand: { value: new THREE.Vector3(...hexToLinear(TERRAIN.grass)) },
+      uRingSea: { value: new THREE.Vector3(...hexToLinear('#2E6E86')) },
+      uRingRim: { value: new THREE.Vector3(...hexToLinear(WROUGHT.slabPale)) },
+      uRingHaze: { value: 0.30 },
     });
 
     this.material = new THREE.RawShaderMaterial({

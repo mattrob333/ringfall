@@ -63,7 +63,9 @@ const PATTERN_GLSL = /* glsl */ `
   // fade toward the feature's AVERAGE COVERAGE (2w/p) as it drops below the
   // sampling rate, which is what a correctly mip-mapped texture would do.
   float gridLine(float x, float p, float w) {
-    float aa = fwidth(x) * 0.7 + 1e-6;
+    // 1.0x the derivative rather than 0.7x: at 0.7 the interior shot measured
+    // 0.069 high-frequency energy against ART.md P10's 0.06 ceiling.
+    float aa = fwidth(x) * 1.0 + 1e-6;
     float f = abs(fract(x / p - 0.5) - 0.5) * p;
     float line = 1.0 - smoothstep(w - aa, w + aa, f);
     float avg = clamp((2.0 * w) / p, 0.0, 1.0);
@@ -411,7 +413,10 @@ export const Materials = {
       baseColor: CDF.gunmetal,
       accentColor: CDF.opticCyan,
       roughness: 0.55,
-      metalness: 0.55,
+      // ART.md §3.2: CDF surfaces are matte, with bare metal ONLY on chamfers
+      // and edges. A high base metalness kills the diffuse term and these read
+      // as black holes indoors; the wear band still drives metalness to 1.0.
+      metalness: 0.12,
       panelSize: 0.9,
       gapWidth: 0.012,
       boltPeriod: 0.22,

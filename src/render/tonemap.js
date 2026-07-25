@@ -50,6 +50,25 @@ function smoothstep01(e0, e1, x) {
   return t * t * (3 - 2 * t);
 }
 
+/**
+ * JS mirror of tonemapHuePreserving() below. tools/palette.mjs gate P4 unit
+ * tests THIS, because sampling the brightest pixels of a rendered frame just
+ * measures the sun disc — which is legitimately near-white and tells you
+ * nothing about whether the operator holds colour.
+ */
+export function tonemapHuePreservingJS(c) {
+  const L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  const Lt = gtTonemap(L);
+  const k = Lt / Math.max(L, 1e-5);
+  const hue = [c[0] * k, c[1] * k, c[2] * k];
+  const pc = [gtTonemap(c[0]), gtTonemap(c[1]), gtTonemap(c[2])];
+  return [
+    hue[0] + (pc[0] - hue[0]) * DESAT_STRENGTH,
+    hue[1] + (pc[1] - hue[1]) * DESAT_STRENGTH,
+    hue[2] + (pc[2] - hue[2]) * DESAT_STRENGTH,
+  ].map((v) => Math.min(1, Math.max(0, v)));
+}
+
 export const TONEMAP_GLSL = /* glsl */ `
   const float GT_P = ${GT.P.toFixed(4)};
   const float GT_A = ${GT.a.toFixed(4)};

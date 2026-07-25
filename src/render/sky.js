@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { SKY } from '../shared/palette.js';
 import { hexToLinear } from '../shared/palette.js';
-import { SUN_INTENSITY, GROUND_BOUNCE } from './exposure.js';
+import { SUN_INTENSITY, GROUND_BOUNCE, SKY_INTENSITY } from './exposure.js';
 import { TERRAIN } from '../shared/palette.js';
 import { DEG } from '../shared/math.js';
 
@@ -121,7 +121,7 @@ export class SkyModel {
 
     const out = this.g.u.uSkySH.value;
     for (let k = 0; k < 9; k++) {
-      const s = (A[k] / Math.PI) * basisConst[k];
+      const s = ((A[k] / Math.PI) * basisConst[k]) * SKY_INTENSITY;
       out[k].set(sh[k][0] * s, sh[k][1] * s, sh[k][2] * s);
     }
     // No DC correction: CHUNK_SH multiplies coefficient 8 by (3z^2 - 1), which

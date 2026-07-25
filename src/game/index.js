@@ -9,7 +9,7 @@ import { setSessionSeed, rng } from '../core/rng.js';
 import { InputState, InputCapture } from '../core/input.js';
 import { CAMERA, SIM_DT } from '../shared/tuning.js';
 import { DEG } from '../shared/math.js';
-import { buildValidationScene } from './validation.js';
+import { buildLevel } from '../world/index.js';
 
 const params = new URLSearchParams(location.search);
 const DETERMINISTIC = params.get('det') === '1';
@@ -56,7 +56,7 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
   resize();
 
   // ---- content -------------------------------------------------------------
-  const world = buildValidationScene(renderer);
+  const world = buildLevel(renderer, null);
   renderer.scene.add(world.root);
 
   // ---- free camera (placeholder until src/player lands) ---------------------
@@ -136,6 +136,28 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
       for (let i = 0; i < n; i++) oneFrame(1 / 60);
       return frames;
     };
+
+    // Render one frame and read it back in the SAME synchronous task.
+    // preserveDrawingBuffer is not enough on its own: by the time a separate
+    // page.evaluate() runs, the compositor has already presented and cleared
+    // the default framebuffer, and readPixels returns all zeros. Measured: the
+    // first capture produced 3,686,400 bytes of which 0 were non-zero.
+    window.__ringfall.capture = () => {
+      oneFrame(1 / 60);
+      const gl = renderer.renderer.getContext();
+      const w = glCanvas.width;
+      const h = glCanvas.height;
+      const buf = new Uint8Array(w * h * 4);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      let bin = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < buf.length; i += chunk) {
+        bin += String.fromCharCode.apply(null, buf.subarray(i, i + chunk));
+      }
+      return { data: btoa(bin), width: w, height: h };
+    };
+
     window.__ringfall.ready = true;
   } else {
     const frame = () => {

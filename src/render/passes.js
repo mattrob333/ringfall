@@ -199,6 +199,11 @@ const TAA_FRAG = /* glsl */ `
   uniform float uFeedback;
   uniform float uVarianceGamma;
   uniform float uReset;
+  // Maps current NDC to previous NDC for a point at infinity (rotation only).
+  // Background pixels have no geometry, so nothing writes them into the
+  // velocity buffer; without this the entire sky and the ring smear whenever
+  // the camera turns, which is the most visible TAA artefact in the game.
+  uniform mat4 uSkyReproj;
 
   vec3 rgbToYCoCg(vec3 c) {
     return vec3(0.25 * c.r + 0.5 * c.g + 0.25 * c.b,
@@ -224,8 +229,15 @@ const TAA_FRAG = /* glsl */ `
         if (d < bestDepth) { bestDepth = d; bestOffset = o; }
       }
     }
-    vec2 vel = texture(uVelocity, vUv + bestOffset).rg;
-    vec2 prevUv = vUv - vel;
+    vec2 prevUv;
+    float centreDepth = texture(uDepth, vUv).r;
+    if (centreDepth >= 1.0) {
+      vec4 pn = uSkyReproj * vec4(vUv * 2.0 - 1.0, 1.0, 1.0);
+      prevUv = (pn.xy / max(pn.w, 1e-6)) * 0.5 + 0.5;
+    } else {
+      vec2 vel = texture(uVelocity, vUv + bestOffset).rg;
+      prevUv = vUv - vel;
+    }
 
     if (prevUv.x < 0.0 || prevUv.x > 1.0 || prevUv.y < 0.0 || prevUv.y > 1.0) {
       fragColor = vec4(curr, 1.0);
@@ -275,9 +287,13 @@ export class TaaPass {
       uFeedback: { value: 0.9 },
       uVarianceGamma: { value: 1.0 },
       uReset: { value: 1 },
+      uSkyReproj: { value: new THREE.Matrix4() },
     };
     this.pass = new FullscreenPass(TAA_FRAG, this.uniforms);
     this._first = true;
+    this._curRot = new THREE.Matrix4();
+    this._prevRot = new THREE.Matrix4();
+    this._hasPrevRot = false;
     this.resize(width, height);
   }
 
@@ -293,6 +309,26 @@ export class TaaPass {
 
   reset() {
     this._first = true;
+  }
+
+  /**
+   * Build the infinity reprojection from the camera's ROTATION only. A point at
+   * infinity is unaffected by camera translation, so zeroing the view matrix
+   * translation gives the exact background motion.
+   */
+  updateSkyReprojection(camera, unjitteredProj) {
+    const v = this._curRot.copy(camera.matrixWorldInverse);
+    v.elements[12] = 0;
+    v.elements[13] = 0;
+    v.elements[14] = 0;
+    v.premultiply(unjitteredProj);
+    if (this._hasPrevRot) {
+      this.uniforms.uSkyReproj.value.copy(this._curRot).invert().premultiply(this._prevRot);
+    } else {
+      this.uniforms.uSkyReproj.value.identity();
+    }
+    this._prevRot.copy(this._curRot);
+    this._hasPrevRot = true;
   }
 
   render(renderer, currentTex, velocityTex, depthTex) {

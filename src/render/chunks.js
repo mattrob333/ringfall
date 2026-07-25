@@ -79,6 +79,7 @@ export const CHUNK_GLOBALS = /* glsl */ `
   uniform vec3  uSkySH[9];          // L2 irradiance, cosine-convolved, /PI folded in
   uniform vec3  uGroundBounce;
   uniform vec4  uFog;               // x density, y heightFalloff, z strength, w baseHeight
+  uniform float uFogStart;          // metres of clear air before aerial perspective begins
   uniform vec3  uCameraPos;
   uniform vec2  uResolution;
   uniform vec2  uNearFar;
@@ -131,15 +132,24 @@ export const CHUNK_SKY = /* glsl */ `
  * ART.md P5 / P6.
  */
 export const CHUNK_FOG = /* glsl */ `
+  // A band of CLEAR AIR before aerial perspective begins.
+  //
+  // Without it, a fog density tuned to satisfy ART.md P5 (>= 22% blend at 60 m)
+  // also washes 10% of the sky over a wall 20 m away, which lifts every shadow
+  // and collapses global contrast. Measured: whole-scene median P95/P05 ratio
+  // was 4.65 against P2's 8:1 floor. Pushing the onset out to 15 m drops the
+  // 20 m haze from 9.9% to 2.8% while all three P5 spec points still pass.
   float fogOpticalDepth(vec3 camPos, vec3 dir, float dist) {
+    float d = max(0.0, dist - uFogStart);
+    if (d <= 0.0) return 0.0;
     float density = uFog.x;
     float hFall   = uFog.y;
     float base    = uFog.w;
     float c0 = camPos.y - base;
     float dy = dir.y;
     float k = density * exp(-hFall * c0);
-    if (abs(dy) < 1e-4) return k * dist;
-    return k * (1.0 - exp(-hFall * dy * dist)) / (hFall * dy);
+    if (abs(dy) < 1e-4) return k * d;
+    return k * (1.0 - exp(-hFall * dy * d)) / (hFall * dy);
   }
 
   vec3 applyAerial(vec3 color, vec3 worldPos) {

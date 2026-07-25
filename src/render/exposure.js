@@ -31,23 +31,30 @@
  * For a 0.18-albedo surface at N.L = 0.85 with sun-disc linear luminance 0.911:
  *     E_lum   = 0.911 * SUN_INTENSITY = 0.911 * 7.4 = 6.74
  *     direct  = (0.18 / PI) * 6.74 * 0.85 = 0.328
- *     ambient = sky SH irradiance/PI (~0.30) * 0.18 = 0.054
- *     total   = 0.382
+ *     ambient = sky SH irradiance/PI (~0.30) * SKY_INTENSITY * 0.18
+ *             = 0.054 * 0.72 = 0.0389
+ *     total   = 0.367
  *
- *     EXPOSURE = 0.3348 / 0.382 = 0.876  ->  rounded to 0.88
+ *     EXPOSURE = 0.3348 / 0.367 = 0.912  ->  rounded to 0.91
  *
- * Shadowed ambient-only lands at 0.054 * 0.88 = 0.0475, which the toe maps to
- * ~0.038. Sunlit lands at 0.336. P95/P05 luminance ratio ~ 8.9:1, inside
- * ART.md P2's 8:1-20:1 window. tools/palette.mjs measures all of this; none of
- * it is taken on trust.
+ * Shadowed ambient-only lands at 0.0389 * 0.91 = 0.0354, which the toe maps to
+ * ~0.0248. Sunlit lands at 0.335. P95/P05 luminance ratio ~ 13.5:1, inside
+ * ART.md P2's 8:1-20:1 window.
+ *
+ * SKY_INTENSITY was 1.0 and, worse, was declared here but never actually
+ * applied to the SH projection. tools/palette.mjs measured whole-scene contrast
+ * at a median of 4.25:1 against a floor of 8:1 — the ambient term was filling
+ * every shadow. Wiring it up at 0.72 is a global change made in response to a
+ * GLOBAL measurement, which is the level ARCHITECTURE.md §0.3 permits; it is
+ * not a global fix for one object looking wrong.
  */
-export const EXPOSURE = 0.88;
+export const EXPOSURE = 0.91;
 
 /** Sun IRRADIANCE scalar. Multiplied by the sun's linear colour. */
 export const SUN_INTENSITY = 7.4;
 
-/** Sky-SH ambient scalar. */
-export const SKY_INTENSITY = 1.0;
+/** Sky-SH ambient scalar. Applied in sky.js projectSH(). */
+export const SKY_INTENSITY = 0.72;
 
 /** Ground bounce as a fraction of sun irradiance. ART.md §4. */
 export const GROUND_BOUNCE = 0.35;

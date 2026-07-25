@@ -161,6 +161,13 @@ export class CharacterBody {
    * normal, which silently re-applied the tangential component on every
    * subsequent iteration (a real bug caught by this module's own selftest —
    * see README.md).
+   *
+   * Each iteration also binary-searches the largest fraction of `remaining`
+   * that keeps the capsule clear (12 fixed iterations — deterministic).
+   * Without this, a substep whose full displacement is blocked gets ZERO
+   * progress even when most of it was free room (e.g. a wall 0.08m away and
+   * a 0.17m substep) — testing only the two endpoints of a discrete substep
+   * is not enough once the substep is larger than the remaining clearance.
    */
   _slideFrom(startPos, disp, outPos, groundNormalScratch) {
     outPos.copy(startPos);
@@ -173,22 +180,44 @@ export class CharacterBody {
     for (let iter = 0; iter < 4; iter++) {
       if (_remaining.lengthSq() < 1e-12) break;
       _candidate.copy(outPos).add(_remaining);
-      const pen = this._findPenetration(_candidate);
+      let pen = this._findPenetration(_candidate);
       if (!pen) {
         outPos.copy(_candidate);
         _remaining.set(0, 0, 0);
         break;
       }
       blocked = true;
-      if (pen.normal.y >= this._walkableCosine && pen.normal.y > bestGroundY) {
-        bestGroundY = pen.normal.y;
-        groundNormalScratch.copy(pen.normal);
-        groundNormal = groundNormalScratch;
-        groundSurfaceId = pen.surfaceId;
+
+      // Binary search: lo stays a known-clear fraction (invariant: outPos is
+      // clear, i.e. fraction 0 is clear), hi a known-blocked fraction.
+      let lo = 0,
+        hi = 1;
+      let contactPen = pen;
+      for (let k = 0; k < 12; k++) {
+        const mid = (lo + hi) * 0.5;
+        _candidate.copy(outPos).addScaledVector(_remaining, mid);
+        const p = this._findPenetration(_candidate);
+        if (p) {
+          hi = mid;
+          contactPen = p;
+        } else {
+          lo = mid;
+        }
       }
-      const into = _remaining.dot(pen.normal);
-      if (into < 0) _remaining.addScaledVector(pen.normal, -into);
-      else _remaining.set(0, 0, 0); // clipping would be a no-op: no progress possible this substep
+      outPos.addScaledVector(_remaining, lo);
+
+      if (contactPen.normal.y >= this._walkableCosine && contactPen.normal.y > bestGroundY) {
+        bestGroundY = contactPen.normal.y;
+        groundNormalScratch.copy(contactPen.normal);
+        groundNormal = groundNormalScratch;
+        groundSurfaceId = contactPen.surfaceId;
+      }
+
+      // Clip the unspent (1-lo) fraction of `remaining` against the contact
+      // plane, then let the next iteration retry with what's left.
+      _remaining.multiplyScalar(1 - lo);
+      const into = _remaining.dot(contactPen.normal);
+      if (into < 0) _remaining.addScaledVector(contactPen.normal, -into);
     }
 
     // Safety net: if outPos itself ended up embedded (accumulated drift,
@@ -243,17 +272,19 @@ export class CharacterBody {
           this._filter,
         );
 
-        if (globalThis.__PHYS_DEBUG) {
-          console.error('step-up', {
-            subStart: _subStart.toArray(),
-            liftDist,
-            posB: _posB.toArray(),
-            resultBBlocked: resultB.blocked,
-            downHit: downHit && { d: downHit.distance, n: downHit.normal.toArray() },
-          });
-        }
-
-        if (downHit && downHit.normal.y >= this._walkableCosine) {
+        // Require the raised slide to be genuinely UNOBSTRUCTED, not merely
+        // "advanced further than the unraised attempt". A blocked-but-closer
+        // result can happen right at a ledge corner: the down-sweep sphere
+        // (radius = capsule radius) touching the corner reports a *blended*
+        // normal that can accidentally clear the walkable-slope threshold
+        // even though the capsule never actually cleared the obstruction
+        // (this is exactly how a 0.5m ledge could get climbed with only a
+        // 0.42m stepHeight in an earlier version of this method — the
+        // capsule "corner-crawled" its way up one bisection-fraction at a
+        // time). Requiring !resultB.blocked means the lift genuinely put the
+        // capsule's whole cross-section above the obstruction before we ever
+        // trust the down-sweep's normal.
+        if (!resultB.blocked && downHit && downHit.normal.y >= this._walkableCosine) {
           const settledY = _posB.y - Math.max(downHit.distance - SKIN, 0);
           const advA = Math.hypot(_posA.x - _subStart.x, _posA.z - _subStart.z);
           const advB = Math.hypot(_posB.x - _subStart.x, _posB.z - _subStart.z);

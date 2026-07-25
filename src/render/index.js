@@ -13,9 +13,13 @@ import { makeTarget } from './fullscreen.js';
 import { exposureFor } from './exposure.js';
 import { JITTER_TABLE } from '../shared/math.js';
 
-export const LAYER_WORLD = 0;
-export const LAYER_TRANSPARENT = 1;
-export const LAYER_VIEWMODEL = 2;
+export const LAYER_WORLD = 0; // opaque, casts shadows
+export const LAYER_TRANSPARENT = 1; // particles, no shadow, no prepass
+export const LAYER_VIEWMODEL = 2; // rendered with the narrow view-model FOV
+// Opaque but NON shadow casting. The megastructure lives here: it is 12-24 km
+// away, and letting it into the shadow cascades would have it shadow the entire
+// playable area from orbit.
+export const LAYER_SKYBOX = 3;
 
 export { LightClusters } from './clusters.js';
 export { GlobalUniforms } from './globals.js';
@@ -157,8 +161,8 @@ export class RingfallRenderer {
     // Pass 0 — light clustering
     this.clusters.build(camera);
 
-    // Pass 1 — shadow cascades (world layer only)
-    camera.layers.set(LAYER_WORLD);
+    // Pass 1 — shadow cascades. The cascade cameras keep their default layer
+    // mask (layer 0 only), so LAYER_SKYBOX geometry never reaches them.
     this.shadows.render(r, this.scene, camera, this.sky.sunDir);
 
     // Jitter for passes 2 and 5 so the prepass depth and the shaded depth agree.
@@ -172,6 +176,7 @@ export class RingfallRenderer {
 
     // Pass 2 — depth + normal + velocity prepass
     camera.layers.set(LAYER_WORLD);
+    camera.layers.enable(LAYER_SKYBOX);
     this.prepass.render(r, this.scene, camera, this._unjitteredProj, true);
     if (vmCamera) {
       vmCamera.layers.set(LAYER_VIEWMODEL);
@@ -196,6 +201,7 @@ export class RingfallRenderer {
     r.setRenderTarget(this.hdr);
     r.clear(true, false, false); // colour only — keep the prepass depth
     camera.layers.set(LAYER_WORLD);
+    camera.layers.enable(LAYER_SKYBOX);
     r.render(this.scene, camera);
 
     // Pass 6 — sky dome at the far plane
@@ -220,6 +226,7 @@ export class RingfallRenderer {
     // Pass 9 — TAA
     let resolved = this.hdr.texture;
     if (this.taaEnabled) {
+      this.taa.updateSkyReprojection(camera, this._unjitteredProj);
       resolved = this.taa.render(r, this.hdr.texture, this.prepass.velocityTex, this.prepass.depthTex);
     }
 

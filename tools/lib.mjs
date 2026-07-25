@@ -108,21 +108,16 @@ export async function gpuInfo(page) {
  * Read the raw drawing buffer as RGBA bytes. We compare .bin, not .png:
  * PNG encoders are free to vary and would give us false diffs.
  */
+/**
+ * Read the raw drawing buffer as RGBA bytes. We compare .bin, not .png:
+ * PNG encoders are free to vary and would give us false diffs.
+ *
+ * The readback MUST happen in the same synchronous task as the render, which is
+ * why this defers to __ringfall.capture() in the page rather than reaching for
+ * the canvas itself. See src/game/index.js for the measurement that forced it.
+ */
 export async function readPixels(page) {
-  const b64 = await page.evaluate(() => {
-    const canvas = document.getElementById('gl');
-    const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true });
-    const w = canvas.width,
-      h = canvas.height;
-    const buf = new Uint8Array(w * h * 4);
-    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
-    let bin = '';
-    const chunk = 0x8000;
-    for (let i = 0; i < buf.length; i += chunk) {
-      bin += String.fromCharCode.apply(null, buf.subarray(i, i + chunk));
-    }
-    return { data: btoa(bin), width: w, height: h };
-  });
+  const b64 = await page.evaluate(() => window.__ringfall.capture());
   return { data: Buffer.from(b64.data, 'base64'), width: b64.width, height: b64.height };
 }
 

@@ -67,13 +67,20 @@ export function runPhysicsSelfTest() {
         entityId: 1,
       });
       const disp = new Vector3(0.5, -0.02, 0); // forward + small gravity nudge each tick
-      for (let i = 0; i < 30; i++) ch.move(disp);
-      const gotOnTop = ch.position.x > 3 && ch.position.y > ledgeHeight - 0.05;
+      // Track whether the capsule EVER stood on top of the ledge — walking
+      // 30 ticks * 0.5 m/tick covers 15 m, more than the 8 m platform, so
+      // checking only the final position would catch it after it walked
+      // off the far edge again. What we're testing is whether it got up.
+      let everOnTop = false;
+      for (let i = 0; i < 20; i++) {
+        ch.move(disp);
+        if (ch.position.x > 3 && ch.position.y > ledgeHeight - 0.05 && ch.grounded) everOnTop = true;
+      }
       push(
         `step-up over ${ledgeHeight}m ledge ${shouldSucceed ? 'succeeds' : 'fails'}`,
-        gotOnTop === shouldSucceed,
-        ch.position.y,
-        shouldSucceed ? ledgeHeight : 0,
+        everOnTop === shouldSucceed,
+        everOnTop,
+        shouldSucceed,
       );
     }
   }
@@ -135,9 +142,13 @@ export function runPhysicsSelfTest() {
       if (bounced) peakAfterBounce = Math.max(peakAfterBounce, body.position.y);
       if (bounced && body.velocity.y <= 0 && peakAfterBounce > 0) break;
     }
-    const floorY = 0; // top of the ground box
-    const gained = peakAfterBounce - floorY;
-    const expected = dropHeight * 0.42 * 0.42;
+    // The sphere's CENTRE rests at y = radius (contact with the y=0 floor),
+    // not y = 0 — so the fall distance is (dropHeight - radius), and the
+    // rise after the bounce should be (dropHeight - radius) * e^2, measured
+    // from that same contact height.
+    const fallDistance = dropHeight - body.radius;
+    const gained = peakAfterBounce - body.radius;
+    const expected = fallDistance * 0.42 * 0.42;
     push('restitution: bounce height / drop height = 0.42^2', approx(gained, expected, expected * 0.03 + 0.01), gained, expected);
   }
 

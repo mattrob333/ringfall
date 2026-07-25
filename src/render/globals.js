@@ -29,10 +29,14 @@ export class GlobalUniforms {
       uSkySH: { value: Array.from({ length: 9 }, () => new THREE.Vector3()) },
       uGroundBounce: { value: new THREE.Vector3() },
       // x density, y heightFalloff, z strength, w baseHeight.
-      // density 0.0052 satisfies ART.md P5 at 200 m (65%) and 500 m (92%) and
-      // over-satisfies it at 60 m (26.8% vs the 22% floor). Derivation in
-      // PROCESS_LOG.md; verified by tools/palette.mjs, not assumed.
-      uFog: { value: new THREE.Vector4(0.0052, 0.0085, 1.0, 0.0) },
+      // With a 15 m clear-air onset, density 0.005675 gives:
+      //    60 m  -> 22.6%   (ART.md P5 floor 22%)
+      //   200 m  -> 65.0%   (floor 65%)
+      //   500 m  -> 93.6%   (floor 92%)
+      //    20 m  ->  2.8%   (was 9.9% with no onset — this is the contrast win)
+      // Verified by tools/palette.mjs, not assumed.
+      uFog: { value: new THREE.Vector4(0.005675, 0.0085, 1.0, 0.0) },
+      uFogStart: { value: 15.0 },
       uCameraPos: { value: new THREE.Vector3() },
       uResolution: { value: new THREE.Vector2(1, 1) },
       uNearFar: { value: new THREE.Vector2(0.05, 4000) },
