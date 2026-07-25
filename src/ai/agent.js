@@ -18,6 +18,7 @@ import {
   AiState,
   AnimState,
   AIM_RATE,
+  BARRIER_TRACK_RATE,
   EYE_HEIGHT_FRACTION,
   TARGET_CHEST_FRACTION,
   HALF_FOV_COS,
@@ -879,9 +880,18 @@ export class AiAgent {
 
     // The CULL keeps the forward arm barrier toward the threat independently
     // of where its body is pointing — that is the whole point of the archetype.
+    // It tracks the THREAT BEARING (recomputed from the live position, so
+    // sidestepping updates it), never the movement heading: a CULL that is
+    // repositioning still holds the slab toward where it last saw you.
     if (this.hasBarrier) {
-      const target = this.hasTarget || this.alerted ? faceYaw : this.yaw;
-      this.barrierYaw = slew(this.barrierYaw, target, aimRate * 1.6, dt);
+      let barrierTarget = this.yaw;
+      if (this.hasLastKnown && (this.hasTarget || this.alerted)) {
+        barrierTarget = Math.atan2(
+          this.lastKnown.x - this.position.x,
+          this.lastKnown.z - this.position.z,
+        );
+      }
+      this.barrierYaw = slew(this.barrierYaw, barrierTarget, BARRIER_TRACK_RATE, dt);
     } else {
       this.barrierYaw = this.yaw;
     }

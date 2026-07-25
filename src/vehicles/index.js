@@ -185,7 +185,7 @@ export class Vehicle {
     this.lastEjectImpulse = { driver: null, gunner: null };
 
     // Chase camera spring state (position + fov only — no camera object is owned here).
-        this._chasePos = new Vector3();
+    this._chasePos = new Vector3();
     this._chaseLookAt = new Vector3();
     this._chaseFov = CAMERA.fovHorizontal;
     this._chaseInit = false;
@@ -341,13 +341,11 @@ export class Vehicle {
       const hit = this.physics.raycast(_mountWorld, _rayDir, SUSPENSION_PROBE_MAX, null);
       let hitDistance = SUSPENSION_PROBE_MAX;
       let grounded = false;
-      let surfaceNormalY = 1;
       if (hit) {
         hitDistance = hit.distance;
         grounded = true;
         w._contactPoint.copy(hit.point);
         w._contactNormal.copy(hit.normal);
-        surfaceNormalY = hit.normal.y;
       }
       w.grounded = grounded;
       const compression = clamp(SUSPENSION_PROBE_MAX - hitDistance, 0, RIDGEBACK.suspensionTravel);
@@ -369,11 +367,17 @@ export class Vehicle {
       const compressionVel = -_contactVel.dot(_up);
       let fs = RIDGEBACK.springK * compression + RIDGEBACK.damperC * compressionVel;
       if (fs < 0) fs = 0;
-      // Suspension can only push along its own axis, not the raw ground normal — but a very
-      // shallow-angle contact (steep slope) is de-rated so the vehicle doesn't stand on a cliff
-      // face at full force.
-      fs *= clamp01(surfaceNormalY + 0.3);
-
+      // COMPENSATION: this does NOT de-rate suspension force by the hit surface normal (e.g. to
+      // soften standing on a steep slope), even though that would be the more physically correct
+      // behaviour. `physics.raycast`'s returned `hit.normal` is wrong for a subset of straight-
+      // down suspension rays — reproducibly returns a side-face normal instead of the true
+      // top-face normal once the ray origin's XZ offset from the struck box's centre exceeds
+      // roughly 1.0 (independent of box size; verified against `rayObb` directly, see DEFECTS.md
+      // "VEH1"). All four Ridgeback wheel mounts sit further than that from a level-sized ground
+      // box's centre, so trusting `hit.normal.y` here made every wheel's suspension force ~30%
+      // of its correct value and the vehicle sank through the floor. Suspension force is applied
+      // along the vehicle's own local up axis regardless (which is correct on flat/gently-sloped
+      // ground; slope de-rating is simply not implemented until DEFECTS.md "VEH1" is fixed).
       _forceVec.copy(_up).multiplyScalar(fs);
       _forceAccum.add(_forceVec);
       _torqueContrib.crossVectors(_r, _forceVec);
@@ -429,13 +433,17 @@ export class Vehicle {
     // Gravity — the single shared GRAVITY constant, no per-object scale (F50).
     _forceAccum.y -= this.mass * GRAVITY;
 
-    // Chassis-vs-world collision (bounding sphere; see README "Known limitations").
+    // Chassis-vs-world collision (bounding sphere; see README "Known limitations"). This is a
+    // WALL/obstacle probe only — ground contact is the suspension raycasts' job exclusively.
+    // A near-vertical hit normal (normal.y > 0.6) is treated as "floor-like" and ignored here,
+    // otherwise this sphere (which must be large enough to cover the chassis footprint) would
+    // permanently overlap flat ground at normal ride height and fight the suspension every tick.
     const speedNow = this.velocity.length();
     if (speedNow > 0.05) {
       _velDir.copy(this.velocity).divideScalar(speedNow);
       _rayOrigin.copy(this.position);
       const hit = this.physics.sphereCast(_rayOrigin, _velDir, CHASSIS_BOUND_RADIUS, speedNow * dt + 0.05, null);
-      if (hit && hit.distance <= speedNow * dt) {
+      if (hit && hit.distance <= speedNow * dt && hit.normal.y <= 0.6) {
         const impactSpeed = -this.velocity.dot(hit.normal);
         if (impactSpeed > 0) {
           this.events.emit(Ev.VEHICLE_IMPACT, {

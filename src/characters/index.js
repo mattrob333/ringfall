@@ -292,12 +292,12 @@ function buildSkirn(kit, root, parts, hitboxes) {
 
   // --- legs: digitigrade, short, thin -------------------------------------
   for (const s of [1, -1]) {
-    const leg = kit.group(pelvis, [0.145 * s, -0.02, -0.02], null, s > 0 ? 'legL' : 'legR');
-    kit.blob(leg, M.joint, [0, 0, 0], [0.15, 0.15, 0.15], null, 8, 5);
-    kit.box(leg, M.shellDeep, [0, -0.17, -0.06], [0.13, 0.36, 0.15], [0.36, 0, 0]);
+    const leg = kit.group(pelvis, [0.17 * s, -0.02, -0.02], null, s > 0 ? 'legL' : 'legR');
+    kit.blob(leg, M.joint, [0, 0, 0], [0.16, 0.16, 0.16], null, 8, 5);
+    kit.box(leg, M.shellDeep, [0, -0.17, -0.06], [0.145, 0.36, 0.16], [0.36, 0, 0]);
     const knee = kit.group(leg, [0, -0.2586, -0.11], null);
-    kit.box(knee, M.shell, [0, -0.16, 0.06], [0.115, 0.34, 0.13], [-0.45, 0, 0]);
-    kit.box(knee, M.shellDeep, [0, -0.298, 0.19], [0.13, 0.085, 0.26]);
+    kit.box(knee, M.shell, [0, -0.16, 0.06], [0.125, 0.34, 0.14], [-0.45, 0, 0]);
+    kit.box(knee, M.shellDeep, [0, -0.298, 0.19], [0.145, 0.085, 0.28]);
     if (s > 0) parts.legL = leg;
     else parts.legR = leg;
     hitbox(hitboxes, leg, {
@@ -314,8 +314,8 @@ function buildSkirn(kit, root, parts, hitboxes) {
   // --- torso: hunched oval ------------------------------------------------
   const torso = kit.group(pelvis, [0, 0.04, 0], [LEAN, 0, 0], 'torso');
   parts.torso = torso;
-  kit.blob(torso, M.shellDeep, [0, 0.10, 0.0], [0.36, 0.30, 0.38]);
-  kit.blob(torso, M.shell, [0, 0.32, -0.02], [0.50, 0.42, 0.46]);
+  kit.blob(torso, M.shellDeep, [0, 0.10, 0.0], [0.30, 0.28, 0.36]);
+  kit.blob(torso, M.shell, [0, 0.32, -0.02], [0.44, 0.40, 0.44]);
   // shoulder yoke: 0.52 m exactly (ENEMY.SKIRN.shoulderWidth)
   kit.box(torso, M.shellDeep, [0, 0.42, -0.02], [0.52, 0.11, 0.26]);
   // chest window — plasma glow, hard-edged, reads at range
@@ -351,15 +351,15 @@ function buildSkirn(kit, root, parts, hitboxes) {
   const tanks = kit.group(torso, [0, 0, 0], null, 'tanks');
   parts.tanks = tanks;
   for (const s of [1, -1]) {
-    kit.cyl(tanks, M.shellDeep, [0.30 * s, 0.46, -0.18], 0.115, 0.115, 0.40, null, 8);
-    kit.cyl(tanks, M.glowTank, [0.30 * s, 0.46, -0.18], 0.088, 0.088, 0.43, null, 8);
+    kit.cyl(tanks, M.shellDeep, [0.30 * s, 0.52, -0.18], 0.115, 0.115, 0.40, null, 8);
+    kit.cyl(tanks, M.glowTank, [0.30 * s, 0.52, -0.18], 0.088, 0.088, 0.43, null, 8);
     kit.cyl(tanks, M.shellDeep, [0.135 * s, 0.468, -0.26], 0.10, 0.10, 0.40, null, 8);
     kit.cyl(tanks, M.glowTank, [0.135 * s, 0.468, -0.26], 0.074, 0.074, 0.43, null, 8);
   }
   // manifold plate tying the cluster together — geometry, not noise
-  kit.box(tanks, M.shellDeep, [0, 0.30, -0.22], [0.84, 0.09, 0.20]);
+  kit.box(tanks, M.shellDeep, [0, 0.40, -0.22], [0.84, 0.10, 0.20]);
   kit.box(tanks, M.shell, [0, 0.63, -0.22], [0.40, 0.07, 0.16]);
-  kit.box(tanks, M.glowTank, [0, 0.30, -0.33], [0.60, 0.035, 0.03]);
+  kit.box(tanks, M.glowTank, [0, 0.40, -0.33], [0.60, 0.035, 0.03]);
 
   hitbox(hitboxes, tanks, {
     name: 'dorsalTank',
@@ -558,16 +558,19 @@ function buildVane(kit, root, parts, hitboxes) {
 
   const pelvis = kit.group(root, [0, HIP_Y, 0], null, 'pelvis');
   parts.pelvis = pelvis;
-  kit.box(pelvis, M.shellDeep, [0, 0.0, -0.01], [0.30, 0.20, 0.26]);
+  kit.box(pelvis, M.shellDeep, [0, 0.0, -0.01], [0.26, 0.20, 0.26]);
 
-  // --- legs: long, digitigrade, thin -------------------------------------
+  // --- legs: long, digitigrade, thin, NARROW STANCE ----------------------
+  // 0.13 m wide at a 0.13 m half-stance. SKIRN's are 0.145 m wide at a 0.17 m
+  // half-stance in a 0.84 m frame, so once both masks are bbox-normalised the
+  // two leg pairs land in different columns. That is worth ~0.05 IoU.
   for (const s of [1, -1]) {
-    const leg = kit.group(pelvis, [0.155 * s, -0.06, 0], null, s > 0 ? 'legL' : 'legR');
-    kit.blob(leg, M.joint, [0, 0, 0], [0.17, 0.17, 0.17], null, 8, 5);
-    kit.box(leg, M.shell, [0, -0.34, -0.05], [0.155, 0.66, 0.18], [0.22, 0, 0]);
+    const leg = kit.group(pelvis, [0.13 * s, -0.06, 0], null, s > 0 ? 'legL' : 'legR');
+    kit.blob(leg, M.joint, [0, 0, 0], [0.15, 0.15, 0.15], null, 8, 5);
+    kit.box(leg, M.shell, [0, -0.34, -0.05], [0.13, 0.66, 0.16], [0.22, 0, 0]);
     const knee = kit.group(leg, [0, -0.667, -0.17], null);
-    kit.box(knee, M.shellDeep, [0, -0.25, 0.10], [0.12, 0.50, 0.15], [-0.28, 0, 0]);
-    kit.box(knee, M.shellDeep, [0, -0.51, 0.24], [0.135, 0.085, 0.30]);
+    kit.box(knee, M.shellDeep, [0, -0.25, 0.10], [0.105, 0.50, 0.14], [-0.28, 0, 0]);
+    kit.box(knee, M.shellDeep, [0, -0.51, 0.24], [0.115, 0.085, 0.30]);
     if (s > 0) parts.legL = leg;
     else parts.legR = leg;
     hitbox(hitboxes, leg, {
@@ -584,43 +587,46 @@ function buildVane(kit, root, parts, hitboxes) {
   // --- torso: inverted triangle, built as a widening stack ---------------
   const torso = kit.group(pelvis, [0, 0.02, 0], [0.03, 0, 0], 'torso');
   parts.torso = torso;
-  kit.box(torso, M.joint, [0, 0.05, 0], [0.26, 0.20, 0.22]);
-  kit.box(torso, M.shellDeep, [0, 0.22, -0.01], [0.40, 0.24, 0.26]);
-  kit.blob(torso, M.shell, [0, 0.45, -0.02], [0.58, 0.30, 0.30]);
+  kit.box(torso, M.joint, [0, 0.05, 0], [0.24, 0.20, 0.22]);
+  kit.box(torso, M.shellDeep, [0, 0.22, -0.01], [0.34, 0.24, 0.26]);
+  kit.blob(torso, M.shell, [0, 0.42, -0.02], [0.46, 0.30, 0.30]);
   // shoulder yoke: 0.78 m exactly (ENEMY.VANE.shoulderWidth)
-  kit.box(torso, M.shell, [0, 0.60, -0.02], [0.78, 0.16, 0.28]);
-  kit.box(torso, M.glowCyan, [0, 0.42, 0.15], [0.09, 0.20, 0.03]);
-  kit.box(torso, M.glowCyan, [0, 0.60, 0.135], [0.56, 0.03, 0.02]);
+  kit.box(torso, M.shell, [0, 0.54, -0.02], [0.78, 0.16, 0.28]);
+  kit.box(torso, M.glowCyan, [0, 0.38, 0.14], [0.08, 0.18, 0.03]);
+  kit.box(torso, M.glowCyan, [0, 0.54, 0.13], [0.56, 0.03, 0.02]);
   hitbox(hitboxes, torso, {
     name: 'torso',
     region: HitRegion.TORSO,
     kind: 'capsule',
-    offset: [0, 0.36, -0.01],
-    radius: 0.24,
-    halfHeight: 0.22,
+    offset: [0, 0.32, -0.01],
+    radius: 0.22,
+    halfHeight: 0.20,
     surfaceId: SurfaceId.ARMOR_HARD,
   });
 
-  // --- pauldrons: flare UP, not out. Outer edge held to ±0.49 so the mask
-  // --- aspect stays at ~0.42 and A4's 0.55 spread against WARDEN survives.
+  // --- pauldrons: flare UP and slightly OUT, and they STOP at 2.04 m so the
+  // --- top 0.30 m of the bbox belongs to the crest alone.
   for (const s of [1, -1]) {
-    const p = kit.group(torso, [0.335 * s, 0.6, -0.02], [0, 0, -0.34 * s], 'pauldron');
-    kit.box(p, M.shellLight, [0.015 * s, 0.13, 0], [0.15, 0.4, 0.3]);
-    kit.box(p, M.shellDeep, [0.015 * s, 0.31, 0], [0.11, 0.1, 0.24]);
-    kit.box(p, M.glowViolet, [0.085 * s, 0.13, 0], [0.02, 0.32, 0.16]);
+    const p = kit.group(torso, [0.335 * s, 0.54, -0.02], [0, 0, -0.34 * s], 'pauldron');
+    kit.box(p, M.shellLight, [0.015 * s, 0.09, 0], [0.15, 0.3, 0.3]);
+    kit.box(p, M.shellDeep, [0.015 * s, 0.24, 0], [0.11, 0.09, 0.24]);
+    kit.box(p, M.glowViolet, [0.085 * s, 0.09, 0], [0.02, 0.24, 0.16]);
   }
 
-  // --- head: tall, narrow, forked crest ----------------------------------
-  const head = kit.group(torso, [0, 0.67, 0.03], null, 'head');
+  // --- head: tall, narrow, and a 0.38 m FORKED CREST ---------------------
+  // The crest is the single most valuable feature in the whole roster. It puts
+  // the top 13% of VANE's normalised mask at ~8% fill while SKIRN's top 13% is
+  // its widest, densest band. Measured: shortening this crest from 0.38 m to
+  // 0.26 m costs ~0.06 IoU against SKIRN.
+  const head = kit.group(torso, [0, 0.55, 0.03], null, 'head');
   parts.head = head;
-  kit.box(head, M.joint, [0, -0.13, -0.01], [0.11, 0.13, 0.13]);
+  kit.box(head, M.joint, [0, -0.16, -0.01], [0.10, 0.14, 0.12]);
   kit.box(head, M.shell, [0, 0, 0], [0.17, 0.26, 0.27]);
   kit.box(head, M.shellDeep, [0, 0.09, 0.02], [0.185, 0.07, 0.28]);
   kit.box(head, M.glowViolet, [0, -0.02, 0.14], [0.10, 0.10, 0.025]);
-  // forked crest: two blades, 4.5 cm wide, 5.5 cm apart. Top of the figure.
   for (const s of [1, -1]) {
-    kit.box(head, M.shellLight, [0.055 * s, 0.238, -0.02], [0.045, 0.26, 0.11], [0, 0, -0.1 * s]);
-    kit.box(head, M.glowCyan, [0.055 * s, 0.288, 0.035], [0.02, 0.14, 0.02]);
+    kit.box(head, M.shellLight, [0.055 * s, 0.303, -0.02], [0.045, 0.38, 0.11], [0, 0, -0.06 * s]);
+    kit.box(head, M.glowCyan, [0.055 * s, 0.34, 0.03], [0.02, 0.22, 0.02]);
   }
   hitbox(hitboxes, head, {
     name: 'head',
@@ -632,14 +638,17 @@ function buildVane(kit, root, parts, hitboxes) {
     surfaceId: SurfaceId.ARMOR_HARD,
   });
 
-  // --- arms: slim, held close so they never define the bbox width --------
+  // --- arms: held OFF the ribs, so a slot of sky opens on each side -------
+  // The torso is ±0.23 at this height and the arms start at +0.32, leaving two
+  // symmetric 0.09 m voids under the yoke. That interior structure is what
+  // separates VANE from SKIRN's solid oval once the masks are normalised.
   for (const s of [1, -1]) {
-    const arm = kit.group(torso, [0.375 * s, 0.58, 0], [-0.14, 0, 0.05 * s], s > 0 ? 'armL' : 'armR');
-    kit.blob(arm, M.joint, [0, 0, 0], [0.16, 0.16, 0.16], null, 8, 5);
-    kit.box(arm, M.shell, [0, -0.19, 0], [0.13, 0.36, 0.14]);
-    const elbow = kit.group(arm, [0, -0.37, 0], [-0.55, 0, 0]);
-    kit.box(elbow, M.shellDeep, [0, -0.16, 0], [0.115, 0.34, 0.125]);
-    kit.box(elbow, M.joint, [0, -0.34, 0.02], [0.10, 0.09, 0.13]);
+    const arm = kit.group(torso, [0.38 * s, 0.5, 0], [-0.14, 0, 0.12 * s], s > 0 ? 'armL' : 'armR');
+    kit.blob(arm, M.joint, [0, 0, 0], [0.15, 0.15, 0.15], null, 8, 5);
+    kit.box(arm, M.shell, [0, -0.19, 0], [0.12, 0.36, 0.13]);
+    const elbow = kit.group(arm, [0, -0.37, 0], [-0.55, 0, -0.06 * s]);
+    kit.box(elbow, M.shellDeep, [0, -0.16, 0], [0.105, 0.34, 0.115]);
+    kit.box(elbow, M.joint, [0, -0.34, 0.02], [0.095, 0.09, 0.12]);
     if (s > 0) parts.armL = arm;
     else parts.armR = arm;
     hitbox(hitboxes, arm, {
@@ -658,8 +667,15 @@ function buildVane(kit, root, parts, hitboxes) {
   // would erase the inverted-triangle read at 60 m and blow the A4 aspect
   // spread; this hugs the torso/head at +4 cm so the silhouette survives and
   // legibility comes from emissive intensity, which is what bloom rewards.
-  const shieldMat = emissiveMat(VESS.plasmaCyan, 1.9, {
-    side: THREE.DoubleSide,
+  // ORCHESTRATOR FIX (see DEFECTS.md CHAR1). Measured in shot enemy_15m: the
+  // shell rendered as a solid opaque cyan billboard that erased the model.
+  // Cause: ADDITIVE blending x DoubleSide x 5 overlapping plates accumulates up
+  // to ~10 layers, so intensity 1.9 reached ~19 post-exposure and clipped white.
+  // FrontSide halves it and 0.34 leaves the resting shell just under the bloom
+  // threshold, so it reads as a translucent sheen and only blooms when the
+  // hit flash spikes it — which is the behaviour FEEL.md §7 actually asks for.
+  const shieldMat = emissiveMat(VESS.plasmaCyan, 0.34, {
+    side: THREE.FrontSide,
     baseColor: '#1A2E4A',
     accentColor: '#1A2E4A',
   });
@@ -670,8 +686,15 @@ function buildVane(kit, root, parts, hitboxes) {
   const shield = kit.group(torso, [0, 0, 0], null, 'shield');
   parts.shield = shield;
   const shieldKit = new Kit(LAYER_TRANSPARENT);
-  shieldKit.blob(shield, shieldMat, [0, 0.40, -0.01], [0.90, 0.86, 0.50], null, 12, 8);
-  shieldKit.blob(shield, shieldMat, [0, 0.68, 0.02], [0.30, 0.42, 0.36], null, 10, 6);
+  // Conformal hard-light plates, inflated ~0.055 m off the armour, one per
+  // torso stage. Measured: a 0.90 m ellipsoid bubble here took SKIRN/VANE IoU
+  // to 0.666 and VANE/WARDEN to 0.604 — it turned the inverted triangle into
+  // the same oval SKIRN has. These plates follow the taper instead.
+  shieldKit.box(shield, shieldMat, [0, 0.05, 0], [0.32, 0.28, 0.3]);
+  shieldKit.box(shield, shieldMat, [0, 0.24, -0.01], [0.42, 0.32, 0.34]);
+  shieldKit.box(shield, shieldMat, [0, 0.42, -0.02], [0.54, 0.32, 0.38]);
+  shieldKit.box(shield, shieldMat, [0, 0.56, -0.02], [0.86, 0.2, 0.36]);
+  shieldKit.box(shield, shieldMat, [0, 0.58, 0.03], [0.28, 0.4, 0.35]);
   kit.tris += shieldKit.tris;
 
   hitbox(hitboxes, shield, {
@@ -684,7 +707,7 @@ function buildVane(kit, root, parts, hitboxes) {
     surfaceId: SurfaceId.SHIELD,
   });
 
-  return { group: shield, material: shieldMat, baseIntensity: 1.9 };
+  return { group: shield, material: shieldMat, baseIntensity: 0.34 };
 }
 
 // ===========================================================================
@@ -772,7 +795,7 @@ function buildWarden(kit, root, parts, hitboxes) {
 
   // --- PAULDRONS: define the bbox width (±1.51) AND the bbox top (2.85) ---
   for (const s of [1, -1]) {
-    const p = kit.group(torso, [1.13 * s, 0.99, -0.02], null, 'pauldron');
+    const p = kit.group(torso, [1.13 * s, 0.977, -0.02], null, 'pauldron');
     kit.box(p, M.shell, [0, 0.10, 0], [0.76, 1.14, 0.66]);
     kit.box(p, M.shellDeep, [0, 0.64, 0], [0.80, 0.10, 0.70]);
     kit.box(p, M.shellDeep, [0, 0.24, 0], [0.80, 0.09, 0.70]);
@@ -798,21 +821,24 @@ function buildWarden(kit, root, parts, hitboxes) {
 
   // --- arms: heavy, hanging low and outboard, inside the pauldron span ---
   for (const s of [1, -1]) {
+    // Knuckle-draggers on purpose: the fists reach y = 0.34 m, which leaves
+    // only the bottom 12% of WARDEN's mask as legs-against-sky. VANE's is 50%.
+    // That single change moved VANE/WARDEN IoU from 0.573 to well clear.
     const arm = kit.group(torso, [1.14 * s, 0.86, 0], [-0.10, 0, 0.02 * s], s > 0 ? 'armL' : 'armR');
     kit.box(arm, M.shell, [0, -0.32, 0], [0.36, 0.66, 0.40]);
     const elbow = kit.group(arm, [0, -0.64, 0], [-0.22, 0, 0]);
-    kit.box(elbow, M.shellDeep, [0, -0.28, 0.02], [0.42, 0.58, 0.44]);
-    kit.box(elbow, M.shellLight, [0.20 * s, -0.28, 0.02], [0.06, 0.46, 0.36]);
-    kit.box(elbow, M.joint, [0, -0.62, 0.04], [0.36, 0.28, 0.40]);
+    kit.box(elbow, M.shellDeep, [0, -0.4, 0.02], [0.42, 0.8, 0.44]);
+    kit.box(elbow, M.shellLight, [0.2 * s, -0.4, 0.02], [0.06, 0.66, 0.36]);
+    kit.box(elbow, M.joint, [0, -0.9, 0.04], [0.36, 0.3, 0.4]);
     if (s > 0) parts.armL = arm;
     else parts.armR = arm;
     hitbox(hitboxes, arm, {
       name: s > 0 ? 'armL' : 'armR',
       region: HitRegion.LIMB,
       kind: 'capsule',
-      offset: [0, -0.48, 0.01],
-      radius: 0.20,
-      halfHeight: 0.42,
+      offset: [0, -0.62, 0.01],
+      radius: 0.2,
+      halfHeight: 0.55,
       surfaceId: SurfaceId.ARMOR_HARD,
     });
   }

@@ -58,7 +58,9 @@ export function runFxSelfTest({ frames = 600, burst = 400, verbose = false } = {
   };
 
   setSessionSeed(1337);
-  const r = rng('fx.selftest');
+  // The test's own jitter comes from the same seeded stream FX uses; there is
+  // no second RNG anywhere in or around this directory.
+  const r = rng('fx');
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.05, 4000);
@@ -166,6 +168,23 @@ export function runFxSelfTest({ frames = 600, burst = 400, verbose = false } = {
         events.emit(Ev.DAMAGE_APPLIED, damage);
       }
 
+      // Surge window: a deliberate over-subscription so the drop path and the
+      // hard caps are genuinely exercised, not merely approached.
+      if (f >= 200 && f < 280) {
+        for (let k = 0; k < 20; k++) {
+          impact.point[0] = r.range(-8, 8); impact.point[1] = r.range(0.2, 3); impact.point[2] = r.range(-8, 8);
+          impact.normal[0] = r.range(-1, 1); impact.normal[1] = 1; impact.normal[2] = r.range(-1, 1);
+          impact.surfaceId = SURFACES[(f + k) % SURFACES.length];
+          impact.energy = r.range(20, 120);
+          events.emit(Ev.SURFACE_IMPACT, impact);
+        }
+        for (let k = 0; k < 8; k++) {
+          fired.weaponId = WEAPONS[(f + k) % WEAPONS.length];
+          fired.muzzle[0] = r.range(-2, 2); fired.muzzle[2] = r.range(-2, 2);
+          events.emit(Ev.WEAPON_FIRED, fired);
+        }
+      }
+
       if (f % 7 === 0) {
         overheat.ownerId = 1 + (f % 5);
         events.emit(Ev.WEAPON_OVERHEAT, overheat);
@@ -226,6 +245,10 @@ export function runFxSelfTest({ frames = 600, burst = 400, verbose = false } = {
   push('decal oldest-out replacement actually fired', fx.decals.replaced > 0, fx.decals.replaced, '> 0');
   push('the caps were actually reached (test is load bearing)',
     peakParticles > PARTICLE_CAP * 0.5, peakParticles, `> ${Math.round(PARTICLE_CAP * 0.5)}`);
+  push('at least one pool saturated, so the drop path ran',
+    fx.add.dropped + fx.alpha.dropped > 0, fx.add.dropped + fx.alpha.dropped, '> 0');
+  push('additive pool saturated under surge', fx.add.dropped > 0, fx.add.dropped, '> 0');
+  push('alpha pool saturated under surge', fx.alpha.dropped > 0, fx.alpha.dropped, '> 0');
 
   // ---- drain: everything must retire on its own ---------------------------
   for (let f = 0; f < 900; f++) {
@@ -263,31 +286,115 @@ export function runFxSelfTest({ frames = 600, burst = 400, verbose = false } = {
   }
 
   // ---- allocation probe ---------------------------------------------------
+  // Runs against a FRESH instance so what is measured is the steady-state
+  // update() loop and nothing else — heapUsed on a heap that has just absorbed
+  // a 23k-particle surge drifts for reasons that have nothing to do with FX.
   // Only meaningful with --expose-gc; otherwise reported as skipped.
   {
     let ok = true;
     let measured = 'skipped (run node with --expose-gc)';
+    let perEvent = 'skipped';
     const gc = typeof globalThis.gc === 'function' ? globalThis.gc : null;
     if (gc && typeof process !== 'undefined') {
-      // Prime the pools so the steady-state path is what gets measured.
-      for (let k = 0; k < 200; k++) {
-        impact.point[0] = r.range(-5, 5); impact.point[2] = r.range(-5, 5);
-        impact.surfaceId = SurfaceId.CONCRETE;
-        impact.energy = 30;
-        events.emit(Ev.SURFACE_IMPACT, impact);
+      const scene2 = new THREE.Scene();
+      const fx3 = new FxSystem({ scene: scene2, globals: fakeGlobals(0.88), camera, clusters: fakeClusters() });
+      const ev = { point: [0, 1, 0], normal: [0, 1, 0], surfaceId: SurfaceId.CONCRETE, energy: 30, damageType: 0, sourceId: 1 };
+
+      // (a) steady-state update() with a loaded decal pool and draining particles.
+      for (let k = 0; k < 300; k++) {
+        ev.point[0] = (k % 30) - 15;
+        ev.point[2] = ((k / 30) | 0) - 5;
+        fx3.onSurfaceImpact(ev);
       }
-      for (let f = 0; f < 60; f++) fx.update(dt, camPos);
-      gc();
-      const before = process.memoryUsage().heapUsed;
-      for (let f = 0; f < 600; f++) fx.update(dt, camPos);
-      const after = process.memoryUsage().heapUsed;
-      const delta = after - before;
-      measured = `${delta} bytes over 600 update() frames`;
-      // 600 frames of a genuinely allocation-free loop should not move the heap
-      // by more than a few KB of interpreter noise.
-      ok = delta < 262144;
+      for (let f = 0; f < 400; f++) fx3.update(dt, camPos); // warm + settle
+      gc(); gc();
+      const b1 = process.memoryUsage().heapUsed;
+      for (let f = 0; f < 2000; f++) fx3.update(dt, camPos);
+      const a1 = process.memoryUsage().heapUsed;
+      const perFrame = (a1 - b1) / 2000;
+      measured = `${perFrame.toFixed(1)} bytes/frame`;
+      // A genuinely allocation-free steady state sits in the interpreter noise
+      // band. 256 B/frame is 15 KB/s — three orders of magnitude below a V8
+      // young-generation scavenge.
+      ok = perFrame < 256;
+
+      // (b) informational: garbage per surface.impact spawn.
+      for (let k = 0; k < 5000; k++) { fx3.add.count = 0; fx3.alpha.count = 0; fx3.onSurfaceImpact(ev); }
+      gc(); gc();
+      const b2 = process.memoryUsage().heapUsed;
+      for (let k = 0; k < 20000; k++) { fx3.add.count = 0; fx3.alpha.count = 0; fx3.onSurfaceImpact(ev); }
+      const a2 = process.memoryUsage().heapUsed;
+      perEvent = `${((a2 - b2) / 20000).toFixed(1)} bytes/impact`;
+
+      fx3.dispose();
+      results.push({ name: 'garbage per surface.impact (informational)', ok: true, measured: perEvent, expected: 'reported, not gated' });
     }
-    push('update() allocates nothing per frame', ok, measured, '< 256 KB heap growth');
+    push('update() allocates nothing per frame', ok, measured, '< 256 bytes/frame');
+  }
+
+  // ---- degraded mode: no clustered lights available -----------------------
+  // `renderer.clusters` is optional. Without it FX must still draw everything,
+  // just without the co-located point lights.
+  {
+    let ok = true;
+    try {
+      const sc = new THREE.Scene();
+      const f = new FxSystem({ scene: sc, globals: fakeGlobals(0.88), camera });
+      const ev = { point: [0, 1, 0], normal: [0, 1, 0], surfaceId: SurfaceId.METAL_PAINTED, energy: 40, damageType: 0 };
+      const th = { ownerId: 1, grenadeType: 'plasma', origin: [0, 1.5, 0], velocity: [4, 3, 0], fuseMs: 3000 };
+      f.onGrenadeThrown(th);
+      for (let i = 0; i < 60; i++) {
+        f.onSurfaceImpact(ev);
+        f.onShieldBroken({ entityId: 2, overkill: 5, point: [0, 1, -3], normal: [0, 0, 1] });
+        f.update(1 / 60, camPos);
+      }
+      ok = f.add.count > 0 && f.lights.reserved === 0 && !f.add.hasNaN();
+      f.dispose();
+    } catch (err) {
+      ok = false;
+    }
+    push('runs without renderer.clusters (no FX lights, everything else works)', ok, ok, true);
+  }
+
+  // ---- determinism --------------------------------------------------------
+  // ARCHITECTURE.md §7: same session seed + same event script => bit-identical
+  // buffers. This is what lets tools/baseline.mjs capture shot 11 (`firefight`)
+  // reproducibly with particles alive on screen.
+  {
+    const runOnce = () => {
+      setSessionSeed(1337);
+      const sc = new THREE.Scene();
+      const f = new FxSystem({ scene: sc, globals: fakeGlobals(0.88), camera, clusters: fakeClusters() });
+      const ev = { point: [0, 1, 0], normal: [0, 1, 0], surfaceId: 0, energy: 30, damageType: 0, sourceId: 1 };
+      const sh = { entityId: 2, overkill: 10, point: [0, 1.4, -5], normal: [0, 0, 1] };
+      const det = { grenadeId: 1, grenadeType: 'plasma', point: [2, 0.2, -4], radius: 4, ownerId: 1 };
+      for (let i = 0; i < 120; i++) {
+        ev.point[0] = (i % 11) - 5;
+        ev.point[2] = ((i / 11) | 0) - 5;
+        ev.surfaceId = SURFACES[i % SURFACES.length];
+        f.onSurfaceImpact(ev);
+        if (i % 17 === 0) f.onShieldBroken(sh);
+        if (i % 29 === 0) f.onGrenadeDetonated(det);
+        f.update(1 / 60, camPos);
+      }
+      const out = {
+        add: Float32Array.from(f.add.aColor.array.subarray(0, f.add.count * 4)),
+        pos: Float32Array.from(f.add.aPos.array.subarray(0, f.add.count * 3)),
+        alpha: Float32Array.from(f.alpha.aPos.array.subarray(0, f.alpha.count * 3)),
+        dec: Float32Array.from(f.decals.aParams.array.subarray(0, f.decals.count * 4)),
+        counts: [f.add.count, f.alpha.count, f.decals.count],
+      };
+      f.dispose();
+      return out;
+    };
+    const a = runOnce();
+    const b = runOnce();
+    const same = (x, y) => x.length === y.length && x.every((v, i) => v === y[i]);
+    const identical =
+      a.counts.join() === b.counts.join() &&
+      same(a.add, b.add) && same(a.pos, b.pos) && same(a.alpha, b.alpha) && same(a.dec, b.dec);
+    push('two identical runs at the same seed are bit-identical', identical,
+      `${a.counts.join('/')} vs ${b.counts.join('/')}`, 'identical');
   }
 
   // ---- dispose / reconstruct ---------------------------------------------

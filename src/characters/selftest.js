@@ -52,8 +52,10 @@ const SS = 4; // supersample factor; raster is MASK_N * SS = 1024
 const RASTER_N = MASK_N * SS;
 
 export const GATE = Object.freeze({
-  a1MinHeightPx: 30,
-  a1MinAreaPx: 250,
+  // ART.md amendment A1: 30 px was unreachable — 17.14 px per metre at the
+  // §8 framing caps a 1.42 m SKIRN at 24.3 px. Floor set below that with margin.
+  a1MinHeightPx: 22,
+  a1MinAreaPx: 170,
   a3MaxIoU: 0.6,
   a4MinAspectSpread: 0.55,
   a5MaxIoU: 0.68,

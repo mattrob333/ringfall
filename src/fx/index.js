@@ -35,6 +35,7 @@ import {
   LIGHT_CAP,
   FX_DRAW_CALLS,
 } from './constants.js';
+import { FxRand } from './rand.js';
 import { ParticlePool } from './particles.js';
 import { DecalPool } from './decals.js';
 import { FxLightPool } from './lights.js';
@@ -92,18 +93,22 @@ export class FxSystem {
     this.scene.add(this.alpha.mesh);
     this.scene.add(this.add.mesh);
 
-    this.rand = rng('fx');
-    this.time = 0;
+    // ARCHITECTURE.md §7.3: `rng('fx')` and nothing else. FxRand draws the
+    // stream ONCE here and serves the hot path from an unboxed table — see
+    // src/fx/rand.js for the measurement that motivated it.
+    this.randSource = rng('fx');
+    this.rand = new FxRand(this.randSource);
 
     // Payload unpacking scratch. Allocated once; every handler reuses these.
     this._p = new Float32Array(3);
     this._n = new Float32Array(3);
 
-    // Camera position cache, updated every frame. Used for LOD and for the
-    // alpha pool's back-to-front sort.
-    this._camX = 0;
-    this._camY = 0;
-    this._camZ = 0;
+    // Camera position cache + elapsed time, updated every frame. Used for LOD
+    // and for the alpha pool's back-to-front sort. Typed array, not four object
+    // fields: V8 boxes a double stored into a plain property, so four writes a
+    // frame would be ~64 bytes of garbage per frame for nothing.
+    // [0]=x [1]=y [2]=z [3]=elapsed seconds
+    this._cam = new Float64Array(4);
 
     // The spawn context handed to every recipe in effects.js. Built once.
     this.ctx = {
@@ -141,6 +146,11 @@ export class FxSystem {
     };
   }
 
+  /** Seconds of FX time elapsed since construction (or since reset()). */
+  get time() {
+    return this._cam[3];
+  }
+
   /**
    * ART.md §7.2 puts the bloom threshold at 1.0 in POST-EXPOSURE linear.
    * Exposure is frozen and owned by `lighting`; reading it here is the
@@ -149,13 +159,17 @@ export class FxSystem {
    */
   _refreshBloomFloor() {
     const e = this.globals?.u?.uExposure?.value;
-    this.ctx.B = Number.isFinite(e) && e > 1e-4 ? 1 / e : 1 / 0.88;
+    const b = Number.isFinite(e) && e > 1e-4 ? 1 / e : 1 / 0.88;
+    // Write only on change: exposure is a frozen per-level constant, so this
+    // is a no-op every frame after the first.
+    if (b !== this.ctx.B) this.ctx.B = b;
   }
 
   _lod(x, y, z) {
-    const dx = x - this._camX;
-    const dy = y - this._camY;
-    const dz = z - this._camZ;
+    const c = this._cam;
+    const dx = x - c[0];
+    const dy = y - c[1];
+    const dz = z - c[2];
     const d2 = dx * dx + dy * dy + dz * dz;
     if (d2 > FX_CULL * FX_CULL) return 0;
     if (d2 > LOD_FAR * LOD_FAR) return 0.28;
@@ -372,23 +386,24 @@ export class FxSystem {
   update(dt, cameraPosition) {
     if (!Number.isFinite(dt) || dt <= 0) dt = 0;
     if (dt > 0.25) dt = 0.25; // same clamp src/core/clock.js applies
-    this.time += dt;
+    const c = this._cam;
+    c[3] += dt;
 
     if (cameraPosition) {
       if (typeof cameraPosition.x === 'number') {
-        this._camX = cameraPosition.x;
-        this._camY = cameraPosition.y;
-        this._camZ = cameraPosition.z;
+        c[0] = cameraPosition.x;
+        c[1] = cameraPosition.y;
+        c[2] = cameraPosition.z;
       } else if (cameraPosition.length >= 3) {
-        this._camX = cameraPosition[0];
-        this._camY = cameraPosition[1];
-        this._camZ = cameraPosition[2];
+        c[0] = cameraPosition[0];
+        c[1] = cameraPosition[1];
+        c[2] = cameraPosition[2];
       }
     } else if (this.camera) {
       const m = this.camera.matrixWorld.elements;
-      this._camX = m[12];
-      this._camY = m[13];
-      this._camZ = m[14];
+      c[0] = m[12];
+      c[1] = m[13];
+      c[2] = m[14];
     }
 
     this._refreshBloomFloor();
@@ -398,8 +413,8 @@ export class FxSystem {
     this.emitters.update(dt, this.ctx, this.lights);
     this.lights.update(dt);
 
-    this.add.update(dt, this._camX, this._camY, this._camZ);
-    this.alpha.update(dt, this._camX, this._camY, this._camZ);
+    this.add.update(dt, c[0], c[1], c[2]);
+    this.alpha.update(dt, c[0], c[1], c[2]);
     this.decals.update(dt);
 
     const s = this.stats;
@@ -421,7 +436,8 @@ export class FxSystem {
     this.decals.clear();
     this.emitters.clear(this.lights);
     this.lights.clear();
-    this.time = 0;
+    this.rand.reset();
+    this._cam[3] = 0;
     this._entityPos.clear();
     this._muzzle.clear();
   }

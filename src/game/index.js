@@ -1,31 +1,54 @@
 // L6 game — wiring and boot. OWNER: orchestrator.
+// This is the ONLY file allowed to know about every subsystem at once.
+// Subsystems below L6 talk to each other through the event bus, never directly.
 
 import * as THREE from 'three';
-import { RingfallRenderer, LAYER_WORLD, LAYER_VIEWMODEL, LAYER_TRANSPARENT } from '../render/index.js';
-import { bindGlobals, Materials, Family, createMaterial } from '../materials/index.js';
+import { RingfallRenderer, LAYER_WORLD, LAYER_VIEWMODEL } from '../render/index.js';
+import { bindGlobals } from '../materials/index.js';
 import { clock } from '../core/clock.js';
 import { events } from '../core/events.js';
-import { setSessionSeed, rng } from '../core/rng.js';
+import { setSessionSeed } from '../core/rng.js';
+import { allocId } from '../core/ids.js';
 import { InputState, InputCapture } from '../core/input.js';
-import { CAMERA, SIM_DT } from '../shared/tuning.js';
+import { CAMERA, SIM_DT, PLAYER } from '../shared/tuning.js';
+import { Archetype, Faction } from '../shared/enums.js';
+import { Ev } from '../shared/events.js';
 import { DEG } from '../shared/math.js';
+
+import { PhysicsWorld } from '../physics/index.js';
 import { buildLevel } from '../world/index.js';
+import { PlayerController } from '../player/index.js';
+import { WeaponSystem, targets } from '../weapons/index.js';
+import { AiDirector } from '../ai/index.js';
+import { buildCharacter, animateCharacter, setShieldState } from '../characters/index.js';
+import { VehicleSystem } from '../vehicles/index.js';
+import { FxSystem, wireFxEvents } from '../fx/index.js';
+import { Hud, wireHudEvents, hudState } from '../ui/index.js';
+import { audio, wireAudioEvents } from '../audio/index.js';
 
 const params = new URLSearchParams(location.search);
 const DETERMINISTIC = params.get('det') === '1';
+const PROFILE = params.get('profile') === '1';
 const SEED = parseInt(params.get('seed') ?? '1337', 10);
+const FORCE_DPR = params.get('dpr') ? parseFloat(params.get('dpr')) : null;
+
+const SQUADS = [
+  { id: 'north', archetypes: ['VANE', 'SKIRN', 'SKIRN', 'CULL'] },
+  { id: 'west', archetypes: ['VANE', 'SKIRN'] },
+  { id: 'east', archetypes: ['WARDEN', 'CULL'] },
+];
 
 export async function boot({ glCanvas, hudCanvas, bootEl }) {
+  const bootStart = clock._now();
   setSessionSeed(SEED);
 
-  const renderer = new RingfallRenderer(glCanvas, {
-    dpr: DETERMINISTIC ? 1 : Math.min(window.devicePixelRatio || 1, 2),
-  });
+  const dpr = FORCE_DPR ?? (DETERMINISTIC ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+  const renderer = new RingfallRenderer(glCanvas, { dpr });
   bindGlobals(renderer.globals);
 
   const camera = new THREE.PerspectiveCamera(60, 16 / 9, CAMERA.near, CAMERA.far);
   const vmCamera = new THREE.PerspectiveCamera(50, 16 / 9, 0.02, 12);
-  camera.layers.enable(LAYER_WORLD);
+  camera.layers.set(LAYER_WORLD);
   vmCamera.layers.set(LAYER_VIEWMODEL);
 
   function applyFov() {
@@ -33,9 +56,9 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
     camera.aspect = aspect;
     vmCamera.aspect = aspect;
     // FEEL.md §2.2 specifies HORIZONTAL fov; three wants vertical.
-    camera.fov = 2 * Math.atan(Math.tan((CAMERA.fovHorizontal * DEG) / 2) / aspect) * (180 / Math.PI);
-    vmCamera.fov =
-      2 * Math.atan(Math.tan((CAMERA.viewModelFovHorizontal * DEG) / 2) / aspect) * (180 / Math.PI);
+    const vert = (h) => 2 * Math.atan(Math.tan((h * DEG) / 2) / aspect) * (180 / Math.PI);
+    camera.fov = vert(CAMERA.fovHorizontal);
+    vmCamera.fov = vert(CAMERA.viewModelFovHorizontal);
     camera.updateProjectionMatrix();
     vmCamera.updateProjectionMatrix();
   }
@@ -43,105 +66,273 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
   function resize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    renderer.setSize(w, h, DETERMINISTIC ? 1 : Math.min(window.devicePixelRatio || 1, 2));
-    if (hudCanvas) {
-      hudCanvas.width = Math.floor(w * (DETERMINISTIC ? 1 : Math.min(window.devicePixelRatio || 1, 2)));
-      hudCanvas.height = Math.floor(h * (DETERMINISTIC ? 1 : Math.min(window.devicePixelRatio || 1, 2)));
-      hudCanvas.style.width = `${w}px`;
-      hudCanvas.style.height = `${h}px`;
-    }
+    renderer.setSize(w, h, dpr);
+    if (hudCanvas) hud?.resize(w, h, dpr);
     applyFov();
   }
+
+  // ---- simulation ---------------------------------------------------------
+  const physics = new PhysicsWorld({ cellSize: 8 });
+  const level = buildLevel(renderer, physics);
+  renderer.scene.add(level.root);
+
+  const playerId = allocId();
+  const player = new PlayerController({
+    physics,
+    events,
+    entityId: playerId,
+    position: level.spawns.player,
+  });
+
+  const weapons = new WeaponSystem({
+    physics,
+    targets,
+    bus: events,
+    ownerId: playerId,
+    faction: Faction.PLAYER,
+    loadout: ['vector_br', 'cadence_ar'],
+  });
+
+  const ai = new AiDirector({ physics, events, targets });
+  const vehicles = new VehicleSystem({ physics, events });
+  const fx = new FxSystem({
+    scene: renderer.scene,
+    globals: renderer.globals,
+    camera,
+    clusters: renderer.clusters,
+    renderer,
+  });
+  const unwireFx = wireFxEvents(fx);
+
+  // ---- enemies + their meshes --------------------------------------------
+  /** @type {Array<{agent:object, handle:object}>} */
+  const bodies = [];
+  let spawnIndex = 0;
+  for (const squad of SQUADS) {
+    for (const archetype of squad.archetypes) {
+      const pos = level.spawns.enemies[spawnIndex % level.spawns.enemies.length];
+      spawnIndex++;
+      const agent = ai.spawn({
+        archetype,
+        position: pos.clone(),
+        squadId: squad.id,
+        faction: Faction.VESS,
+      });
+      if (!agent) continue;
+      const handle = buildCharacter(archetype);
+      // Do NOT force every descendant onto LAYER_WORLD: src/characters assigns
+      // its own layers, and the VANE's translucent shield shell belongs to
+      // LAYER_TRANSPARENT. Overriding it rendered the shell as an opaque cyan
+      // billboard in the opaque pass.
+      renderer.scene.add(handle.root);
+      bodies.push({ agent, handle });
+    }
+  }
+
+  // ---- vehicle ------------------------------------------------------------
+  const ridgeback = vehicles.spawn({ type: 'ridgeback', position: level.spawns.vehicle, yaw: 0.6 });
+
+  // ---- HUD ----------------------------------------------------------------
+  const hud = hudCanvas ? new Hud(hudCanvas) : null;
+  let unwireHud = null;
+  if (hud) {
+    // Resolves DEFECTS.md UI1: shield events carry an entityId but nothing told
+    // the HUD which one is the player, so an enemy VANE popping its shield
+    // would have fired the player's screen-edge flare.
+    hud.setPlayerId?.(playerId);
+    unwireHud = wireHudEvents(hud);
+  }
+
   window.addEventListener('resize', resize);
   resize();
 
-  // ---- content -------------------------------------------------------------
-  const world = buildLevel(renderer, null);
-  renderer.scene.add(world.root);
+  // ---- audio (needs a user gesture) --------------------------------------
+  let unwireAudio = null;
+  const startAudio = async () => {
+    if (unwireAudio) return;
+    await audio.init();
+    unwireAudio = wireAudioEvents(audio);
+  };
 
-  // ---- free camera (placeholder until src/player lands) ---------------------
+  // ---- input --------------------------------------------------------------
   const input = new InputState();
   const capture = new InputCapture(glCanvas, input);
-  glCanvas.addEventListener('click', () => capture.requestLock());
+  capture.sensitivity = CAMERA.sensitivity;
+  glCanvas.addEventListener('click', () => {
+    capture.requestLock();
+    startAudio();
+  });
 
-  const camState = { pos: new THREE.Vector3(0, 1.62, 14), yaw: 0, pitch: -0.05 };
-  const fwd = new THREE.Vector3();
-  const right = new THREE.Vector3();
-
-  function stepCamera(dt) {
-    camState.yaw += input.lookYaw;
-    camState.pitch = Math.max(-1.5, Math.min(1.5, camState.pitch + input.lookPitch));
-    input.lookYaw = 0;
-    input.lookPitch = 0;
-
-    fwd.set(-Math.sin(camState.yaw), 0, -Math.cos(camState.yaw));
-    right.set(Math.cos(camState.yaw), 0, -Math.sin(camState.yaw));
-    const speed = (input.crouch ? 12 : 4.4) * dt;
-    camState.pos.addScaledVector(fwd, input.moveZ * speed);
-    camState.pos.addScaledVector(right, input.moveX * speed);
-    if (input.jump) camState.pos.y += speed;
-  }
+  // ---- camera binding -----------------------------------------------------
+  const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
+  // Capture-only free camera. Without it every baseline shot renders from the
+  // player's eye, because present() re-syncs the camera to the controller after
+  // the harness has positioned it.
+  let camOverride = null;
 
   function syncCamera() {
-    camera.position.copy(camState.pos);
-    camera.quaternion.setFromEuler(new THREE.Euler(camState.pitch, camState.yaw, 0, 'YXZ'));
+    if (camOverride) {
+      camera.position.set(camOverride.pos[0], camOverride.pos[1], camOverride.pos[2]);
+      _euler.set(camOverride.pitch, camOverride.yaw, 0);
+      camera.quaternion.setFromEuler(_euler);
+      vmCamera.position.copy(camera.position);
+      vmCamera.quaternion.copy(camera.quaternion);
+      return;
+    }
+    const inVehicle = ridgeback && ridgeback.seats?.driver === playerId;
+    if (inVehicle && ridgeback.getChaseCameraTarget) {
+      const t = ridgeback.getChaseCameraTarget();
+      camera.position.set(t.position.x, t.position.y, t.position.z);
+      camera.lookAt(t.lookAt.x, t.lookAt.y, t.lookAt.z);
+      if (t.fov && Math.abs(camera.fov - t.fov) > 0.01) {
+        camera.fov = t.fov;
+        camera.updateProjectionMatrix();
+      }
+    } else {
+      camera.position.copy(player.eyePosition);
+      _euler.set(player.pitch, player.yaw, 0);
+      camera.quaternion.setFromEuler(_euler);
+    }
     vmCamera.position.copy(camera.position);
     vmCamera.quaternion.copy(camera.quaternion);
+  }
+
+  const _playerState = {
+    entityId: playerId,
+    position: new THREE.Vector3(),
+    velocity: new THREE.Vector3(),
+    forward: new THREE.Vector3(),
+    faction: Faction.PLAYER,
+    alive: true,
+  };
+
+  const _lunge = new THREE.Vector3();
+  function step(dt) {
+    // Aim-assist turn friction (FEEL.md §4.8) scales look input before the
+    // controller consumes it. Uses last frame's aim state, which is one frame
+    // of latency the player cannot perceive at 120 Hz.
+    const ls = weapons.getLookScale();
+    if (ls !== 1) {
+      input.lookYaw *= ls;
+      input.lookPitch *= ls;
+    }
+
+    player.update(dt, input);
+    weapons.update(dt, input, player);
+    if (weapons.consumeLunge(_lunge)) player.applyImpulse?.(_lunge);
+
+    _playerState.position.copy(player.position);
+    _playerState.velocity.copy(player.velocity ?? _playerState.velocity);
+    _playerState.forward.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+    _playerState.alive = player.alive;
+
+    ai.update(dt, _playerState);
+    vehicles.update(dt);
+    physics.step(dt);
+  }
+
+  // ---- per-frame presentation --------------------------------------------
+  const _tmp = new THREE.Vector3();
+  function present(dt) {
+    syncCamera();
+
+    for (const { agent, handle } of bodies) {
+      handle.root.position.set(agent.position.x, agent.position.y, agent.position.z);
+      handle.root.rotation.y = agent.yaw ?? 0;
+      handle.root.visible = agent.alive || agent.animState === 'dead';
+      animateCharacter(handle, {
+        state: agent.animState,
+        dt,
+        speed: agent.speed01 ?? 0,
+        aimYaw: (agent.aimYaw ?? 0) - (agent.yaw ?? 0),
+        aimPitch: agent.aimPitch ?? 0,
+      });
+      if (agent.archetype === 'VANE' && agent.maxShield) {
+        setShieldState(handle, {
+          fraction: agent.shield / agent.maxShield,
+          flash01: agent.shieldFlash ?? 0,
+        });
+      }
+    }
+
+    fx.update(dt, camera.getWorldPosition(_tmp));
+
+    if (hud) {
+      populateHudState(hudState, player, weapons, ai);
+      hud.update(hudState, dt);
+      hud.render();
+    }
+
+    if (audio.ready) {
+      camera.getWorldDirection(_tmp);
+      audio.setListener(camera.position, _tmp, camera.up);
+      audio.update(dt);
+    }
+
+    renderer.render(camera, vmCamera, clock.simTime);
+  }
+
+  // ---- loop ---------------------------------------------------------------
+  let frames = 0;
+  function oneFrame(dtOverride) {
+    const dt = dtOverride ?? clock.frameDt ?? 1 / 60;
+    capture.sample(dt);
+    clock.tick(step);
+    present(clock.frameDt || 1 / 60);
+    input.endFrame();
+    frames++;
+    if (frames === 3 && bootEl && !DETERMINISTIC) bootEl.classList.add('hidden');
   }
 
   syncCamera();
   camera.updateMatrixWorld(true);
   await renderer.prewarm(camera);
+  const bootMs = Math.round((clock._now() - bootStart) * 1000);
 
   window.__ringfall = {
     renderer,
+    physics,
     camera,
     vmCamera,
     scene: renderer.scene,
     clock,
     events,
-    world,
+    level,
+    player,
+    weapons,
+    ai,
+    vehicles,
+    fx,
+    hud,
+    bodies,
+    bootMs,
     ready: false,
-    version: '0.1.0-slice',
+    version: '0.3.0',
+    // The SAME InputState the controller reads, so a scripted test cannot
+    // accidentally exercise a different code path than a human does.
+    driveInput: input,
     setCamera(pos, yaw, pitch) {
-      camState.pos.set(pos[0], pos[1], pos[2]);
-      camState.yaw = yaw;
-      camState.pitch = pitch;
+      camOverride = { pos, yaw, pitch };
       syncCamera();
+      camera.updateMatrixWorld(true);
       renderer.taa.reset();
+    },
+    clearCamera() {
+      camOverride = null;
     },
     stats: () => ({ ...renderer.stats, ...renderer.clusters.stats() }),
   };
 
-  let frames = 0;
-  function oneFrame(dtOverride) {
-    capture.sample(dtOverride ?? clock.frameDt ?? 1 / 60);
-    clock.tick((dt) => stepCamera(dt));
-    syncCamera();
-    renderer.render(camera, vmCamera, clock.simTime);
-    input.endFrame();
-    frames++;
-    if (frames === 3 && bootEl) bootEl.classList.add('hidden');
-  }
-
   if (DETERMINISTIC) {
-    // ARCHITECTURE.md §7.4: in capture mode the harness drives frames
-    // explicitly. requestAnimationFrame is never scheduled, so a headless or
-    // backgrounded page still advances exactly the frames it is told to.
     clock.setDeterministic(true, 1 / 60);
-    // The overlay's fade is a CSS transition and capture advances no wall time,
-    // so it must be removed outright rather than faded.
     if (bootEl) bootEl.style.display = 'none';
     window.__ringfall.step = (n = 1) => {
       for (let i = 0; i < n; i++) oneFrame(1 / 60);
       return frames;
     };
-
-    // Render one frame and read it back in the SAME synchronous task.
-    // preserveDrawingBuffer is not enough on its own: by the time a separate
-    // page.evaluate() runs, the compositor has already presented and cleared
-    // the default framebuffer, and readPixels returns all zeros. Measured: the
-    // first capture produced 3,686,400 bytes of which 0 were non-zero.
+    // Readback MUST happen in the same synchronous task as the render: by the
+    // time a separate page.evaluate() runs the compositor has presented and
+    // cleared the default framebuffer. Measured: 3,686,400 bytes, 0 non-zero.
     window.__ringfall.capture = () => {
       oneFrame(1 / 60);
       const gl = renderer.renderer.getContext();
@@ -157,9 +348,9 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
       }
       return { data: btoa(bin), width: w, height: h };
     };
-
     window.__ringfall.ready = true;
   } else {
+    if (PROFILE) installProfileDriver(window.__ringfall, input, player);
     const frame = () => {
       oneFrame();
       if (frames >= 3) window.__ringfall.ready = true;
@@ -169,4 +360,114 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
   }
 
   return window.__ringfall;
+}
+
+const RETICLE_KIND = {
+  cadence_ar: 'auto',
+  vector_br: 'burst',
+  longbow: 'precision',
+  breaker: 'shotgun',
+  ember_repeater: 'plasma',
+  vess_sidearm: 'plasma',
+};
+
+/** Populate the HUD state object the ui owner declared. No allocation. */
+function populateHudState(s, player, weapons, ai) {
+  // PlayerController keeps the two-layer pool in `state`, not as flat fields.
+  // Reading player.shield gave undefined, which reached the HUD as
+  // rgba(120,110,105,NaN) and threw inside a CanvasGradient.
+  const st = player.state;
+  s.shield = st.shield;
+  s.shieldMax = st.maxShield;
+  s.health = st.health;
+  s.healthMax = st.maxHealth;
+  s.shieldRecharging = !!player.shieldRecharging;
+  s.dead = !player.alive;
+
+  const slot = weapons.slots[weapons.activeIndex];
+  if (slot && s.weapon) {
+    s.weapon.id = slot.id;
+    s.weapon.name = slot.def.name ?? slot.id.replace(/_/g, ' ').toUpperCase();
+    s.weapon.ammo = slot.ammo | 0;
+    s.weapon.magSize = slot.def.mag | 0;
+    s.weapon.reserve = slot.reserve | 0;
+    s.weapon.reloading = !!weapons.reloading;
+    s.weapon.reloadProgress = weapons.reloadProgress ?? 0;
+    s.weapon.heat = slot.heat ?? 0;
+    s.weapon.overheated = !!slot.overheated;
+    s.weapon.scoped = !!weapons.scoped;
+    s.weapon.magnification = weapons.magnification || 1;
+    s.weapon.charge = weapons.charge ?? 0;
+  }
+  const other = weapons.slots[1 - weapons.activeIndex];
+  if (other && s.offhandWeapon) {
+    s.offhandWeapon.id = other.id;
+    s.offhandWeapon.name = other.def.name ?? other.id.replace(/_/g, ' ').toUpperCase();
+    s.offhandWeapon.ammo = other.ammo | 0;
+    s.offhandWeapon.reserve = other.reserve | 0;
+  }
+
+  const aim = weapons.getAimState();
+  if (aim && s.reticle) {
+    s.reticle.hot = !!aim.hot;
+    s.reticle.spreadDeg = weapons.currentSpreadDeg?.() ?? slot?.def?.spreadDeg ?? 0.6;
+    s.reticle.kind = RETICLE_KIND[slot?.id] ?? 'auto';
+  }
+
+  if (s.grenades) {
+    s.grenades.frag = weapons.grenades.frag | 0;
+    s.grenades.plasma = weapons.grenades.plasma | 0;
+    s.grenades.selected = weapons.grenadeType;
+  }
+
+  // Motion tracker: player-relative metres, hostiles only.
+  if (s.tracker) {
+    const out = s.tracker.entries;
+    out.length = 0;
+    const px = player.position.x;
+    const py = player.position.y;
+    const pz = player.position.z;
+    for (const a of ai.agents) {
+      if (!a.alive) continue;
+      const dx = a.position.x - px;
+      const dz = a.position.z - pz;
+      if (dx * dx + dz * dz > s.tracker.rangeM * s.tracker.rangeM) continue;
+      const dy = a.position.y - py;
+      out.push({
+        x: dx,
+        z: dz,
+        elevation: dy > 1.5 ? 1 : dy < -1.5 ? -1 : 0,
+        hostile: true,
+      });
+    }
+  }
+}
+
+/**
+ * Scripted gameplay for tools/profile.mjs: the camera must be IN MOTION with AI
+ * alive and weapons firing, or the numbers describe a screensaver.
+ * ARCHITECTURE.md §8.
+ */
+function installProfileDriver(rf, input, player) {
+  let t = 0;
+  rf.beginProfile = () => {
+    t = 0;
+    rf._profileTick = (dt) => {
+      t += dt;
+      input.moveZ = Math.sin(t * 0.4) > 0 ? 1 : -1;
+      input.moveX = Math.cos(t * 0.31) > 0 ? 1 : -1;
+      input.lookYaw = Math.sin(t * 0.7) * 0.02;
+      input.lookPitch = Math.sin(t * 0.23) * 0.004;
+      input.hasLookInput = true;
+      input.fire = Math.sin(t * 1.7) > -0.2;
+      input.firePressed = input.fire;
+      input.jump = Math.sin(t * 0.9) > 0.93;
+      input.jumpPressed = input.jump;
+      input.grenadePressed = Math.sin(t * 0.21) > 0.995;
+      input.reloadPressed = Math.sin(t * 0.13) > 0.997;
+    };
+  };
+  rf.endProfile = () => {
+    rf._profileTick = null;
+  };
 }

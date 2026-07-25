@@ -14,9 +14,18 @@ import { SurfaceId, DamageType } from '../shared/enums.js';
 import { Shape, Decal, FxColor } from './constants.js';
 
 // --- scratch, module level, never reallocated -------------------------------
-let _dx = 0, _dy = 0, _dz = 0;
-let _tx = 0, _ty = 0, _tz = 0;
-let _bx = 0, _by = 0, _bz = 0;
+//
+// This is a Float32Array rather than nine `let` bindings ON PURPOSE. V8 stores
+// a module-level `let` holding a double as a boxed HeapNumber, so every write
+// to one allocates ~16 bytes. A single concrete impact writes this scratch ~45
+// times; measured, that was ~670 bytes of garbage PER BULLET HOLE. Typed-array
+// element stores are unboxed and allocate nothing.
+//
+//   [0..2] direction (cone output)   [3..5] tangent   [6..8] bitangent
+const _s = new Float32Array(9);
+const D0 = 0, D1 = 1, D2 = 2;
+const T0 = 3, T1 = 4, T2 = 5;
+const B0 = 6, B1 = 7, B2 = 8;
 
 /** Build an orthonormal basis around (nx,ny,nz) into the module scratch. */
 function basis(nx, ny, nz) {
@@ -28,10 +37,10 @@ function basis(nx, ny, nz) {
   let tz = ux * ny - uy * nx;
   const tl = Math.sqrt(tx * tx + ty * ty + tz * tz) || 1;
   tx /= tl; ty /= tl; tz /= tl;
-  _tx = tx; _ty = ty; _tz = tz;
-  _bx = ny * tz - nz * ty;
-  _by = nz * tx - nx * tz;
-  _bz = nx * ty - ny * tx;
+  _s[T0] = tx; _s[T1] = ty; _s[T2] = tz;
+  _s[B0] = ny * tz - nz * ty;
+  _s[B1] = nz * tx - nx * tz;
+  _s[B2] = nx * ty - ny * tx;
 }
 
 /**
@@ -44,9 +53,9 @@ function cone(rand, nx, ny, nz, spread) {
   const phi = rand.next() * Math.PI * 2;
   const cp = Math.cos(phi);
   const sp = Math.sin(phi);
-  _dx = nx * cosA + _tx * sinA * cp + _bx * sinA * sp;
-  _dy = ny * cosA + _ty * sinA * cp + _by * sinA * sp;
-  _dz = nz * cosA + _tz * sinA * cp + _bz * sinA * sp;
+  _s[D0] = nx * cosA + _s[T0] * sinA * cp + _s[B0] * sinA * sp;
+  _s[D1] = ny * cosA + _s[T1] * sinA * cp + _s[B1] * sinA * sp;
+  _s[D2] = nz * cosA + _s[T2] * sinA * cp + _s[B2] * sinA * sp;
 }
 
 /**
@@ -188,7 +197,7 @@ function metalImpact(ctx, px, py, pz, nx, ny, nz, e, lod, B, rand, surfaceId) {
     const sp = rand.range(5, 15) * e;
     const c = rand.bool(0.55) ? hot : warm;
     ctx.add.spawn(
-      px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.16, 0.42), 0.016, 0.006,
       c[0], c[1], c[2], 5.5 * B, 0.35 * B,
       1.5, 1.0, 0, 0, Shape.STREAK, 0.05, rand.next(), 1, 1.3,
@@ -201,7 +210,7 @@ function metalImpact(ctx, px, py, pz, nx, ny, nz, e, lod, B, rand, surfaceId) {
     cone(rand, nx, ny, nz, 0.55);
     const sp = rand.range(24, 42);
     ctx.add.spawn(
-      px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.09, 0.16), 0.022, 0.010,
       hot[0], hot[1], hot[2], 7 * B, 0.4 * B,
       0.6, 1.0, 0, 0, Shape.STREAK, 0.075, rand.next(), 1, 1.1,
@@ -215,7 +224,7 @@ function metalImpact(ctx, px, py, pz, nx, ny, nz, e, lod, B, rand, surfaceId) {
     cone(rand, nx, ny, nz, 0.9);
     const sp = rand.range(0.6, 2.2);
     ctx.alpha.spawn(
-      px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.30, 0.60), 0.05, 0.26,
       dc[0], dc[1], dc[2], 1, 1,
       3.2, 0.05, rand.next() * 6.28, rand.range(-1, 1),
@@ -250,7 +259,7 @@ function stoneImpact(ctx, px, py, pz, nx, ny, nz, e, lod, B, rand, surfaceId) {
     cone(rand, nx, ny, nz, 1.0);
     const sp = rand.range(0.8, 3.4) * e;
     ctx.alpha.spawn(
-      px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.45, 1.05), rand.range(0.06, 0.13), rand.range(0.35, 0.70),
       dustCol[0], dustCol[1], dustCol[2], 1, 1,
       2.6, 0.10, rand.next() * 6.28, rand.range(-1.2, 1.2),
@@ -264,7 +273,7 @@ function stoneImpact(ctx, px, py, pz, nx, ny, nz, e, lod, B, rand, surfaceId) {
     cone(rand, nx, ny, nz, 0.7);
     const sp = rand.range(3, 9) * e;
     ctx.alpha.spawn(
-      px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.5, 1.1), rand.range(0.012, 0.030), rand.range(0.010, 0.022),
       chip[0], chip[1], chip[2], 1, 1,
       0.35, 1.0, rand.next() * 6.28, rand.range(-8, 8),
@@ -292,7 +301,7 @@ function softImpact(ctx, px, py, pz, nx, ny, nz, e, lod, rand, surfaceId) {
     cone(rand, nx, ny, nz, 1.0);
     const sp = rand.range(0.7, 2.8) * e;
     ctx.alpha.spawn(
-      px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.5, 1.2), rand.range(0.07, 0.15), rand.range(0.32, 0.62),
       col[0], col[1], col[2], 1, 1,
       2.9, 0.14, rand.next() * 6.28, rand.range(-1, 1),
@@ -306,7 +315,7 @@ function softImpact(ctx, px, py, pz, nx, ny, nz, e, lod, rand, surfaceId) {
     cone(rand, nx, ny, nz, 0.75);
     const sp = rand.range(2.5, 7.5) * e;
     ctx.alpha.spawn(
-      px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.45, 0.95), rand.range(0.012, 0.034), rand.range(0.008, 0.020),
       col[0] * 0.8, col[1] * 0.8, col[2] * 0.8, 1, 1,
       0.4, 1.0, rand.next() * 6.28, rand.range(-9, 9),
@@ -336,7 +345,7 @@ function glassImpact(ctx, px, py, pz, nx, ny, nz, e, lod, B, rand) {
     cone(rand, nx, ny, nz, 0.9);
     const sp = rand.range(3, 11) * e;
     ctx.add.spawn(
-      px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.5, 1.2), rand.range(0.020, 0.055), rand.range(0.010, 0.030),
       c[0], c[1], c[2], 2.4 * B, 0.15 * B,
       0.25, 1.0, rand.next() * 6.28, rand.range(-10, 10),
@@ -377,7 +386,7 @@ function vessImpact(ctx, px, py, pz, nx, ny, nz, e, lod, B, rand) {
     const sp = rand.range(4, 12) * e;
     const col = rand.bool(0.7) ? c : v;
     ctx.add.spawn(
-      px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.14, 0.32), 0.016, 0.005,
       col[0], col[1], col[2], 4.5 * B, 0.2 * B,
       2.0, 0.6, 0, 0, Shape.STREAK, 0.05, rand.next(), 1, 1.4,
@@ -415,7 +424,7 @@ function wroughtImpact(ctx, px, py, pz, nx, ny, nz, e, lod, B, rand) {
     cone(rand, nx, ny, nz, 0.9);
     const sp = rand.range(6, 18) * e;
     ctx.add.spawn(
-      px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.10, 0.28), 0.015, 0.005,
       p[0], p[1], p[2], 6 * B, 0.3 * B,
       1.2, 1.0, 0, 0, Shape.STREAK, 0.055, rand.next(), 1, 1.5,
@@ -439,7 +448,7 @@ function fleshImpact(ctx, px, py, pz, nx, ny, nz, e, lod, B, rand) {
     cone(rand, nx, ny, nz, 1.0);
     const sp = rand.range(1.5, 5.5) * e;
     ctx.add.spawn(
-      px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.18, 0.40), rand.range(0.014, 0.030), 0.002,
       c[0], c[1], c[2], 3.2 * B, 0.1 * B,
       3.0, 0.85, 0, 0, Shape.SPARK, 0, rand.next(), 1, 1.6,
@@ -480,13 +489,13 @@ function shieldImpact(ctx, px, py, pz, nx, ny, nz, e, lod, B, rand) {
     const cp = Math.cos(phi);
     const sp2 = Math.sin(phi);
     const lift = rand.range(0.05, 0.25);
-    _dx = _tx * cp + _bx * sp2 + nx * lift;
-    _dy = _ty * cp + _by * sp2 + ny * lift;
-    _dz = _tz * cp + _bz * sp2 + nz * lift;
+    _s[D0] = _s[T0] * cp + _s[B0] * sp2 + nx * lift;
+    _s[D1] = _s[T1] * cp + _s[B1] * sp2 + ny * lift;
+    _s[D2] = _s[T2] * cp + _s[B2] * sp2 + nz * lift;
     const sp = rand.range(3, 9);
     ctx.add.spawn(
       px + nx * 0.02, py + ny * 0.02, pz + nz * 0.02,
-      _dx * sp, _dy * sp, _dz * sp,
+      _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.08, 0.20), 0.016, 0.004,
       c[0], c[1], c[2], 6 * B, 0.2 * B,
       4.0, 0, 0, 0, Shape.STREAK, 0.045, rand.next(), 1, 1.5,
@@ -508,7 +517,7 @@ function waterImpact(ctx, px, py, pz, nx, ny, nz, e, lod, B, rand) {
     cone(rand, nx, ny, nz, 0.5);
     const sp = rand.range(2, 6) * e;
     ctx.alpha.spawn(
-      px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.3, 0.7), 0.02, 0.01,
       c[0], c[1], c[2], 1, 1,
       0.3, 1.0, 0, 0, Shape.SPARK, 0, rand.next(), 0.7, 1.0,
@@ -557,7 +566,7 @@ export function muzzleFlash(ctx, mx, my, mz, dx, dy, dz, family) {
     cone(rand, dx, dy, dz, 0.16);
     const sp = rand.range(11, 22);
     ctx.add.spawn(
-      mx, my, mz, _dx * sp, _dy * sp, _dz * sp,
+      mx, my, mz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.035, 0.075), 0.022, 0.006,
       c[0], c[1], c[2], 12 * B, 0.5 * B,
       3.0, 0.2, 0, 0, Shape.STREAK, 0.05, rand.next(), 1, 1.6,
@@ -804,7 +813,7 @@ export function bouncePuff(ctx, px, py, pz, nx, ny, nz, surfaceId, speed) {
     cone(rand, nx, ny, nz, 1.0);
     const sp = rand.range(0.4, 1.6) * e;
     ctx.alpha.spawn(
-      px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       rand.range(0.35, 0.7), 0.06, rand.range(0.20, 0.38),
       col[0], col[1], col[2], 1, 1,
       3.0, 0.08, rand.next() * 6.28, rand.range(-1, 1),
@@ -817,7 +826,7 @@ export function bouncePuff(ctx, px, py, pz, nx, ny, nz, surfaceId, speed) {
     cone(rand, nx, ny, nz, 0.7);
     const sp = rand.range(3, 8);
     ctx.add.spawn(
-      px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
       0.16, 0.014, 0.004,
       hot[0], hot[1], hot[2], 4 * ctx.B, 0.2 * ctx.B,
       1.5, 1.0, 0, 0, Shape.STREAK, 0.05, rand.next(), 1, 1.3,
@@ -836,7 +845,7 @@ export function vehicleImpact(ctx, px, py, pz, nx, ny, nz, relativeSpeed) {
       cone(rand, nx, ny, nz, 1.0);
       const sp = rand.range(1, 4) * e;
       ctx.alpha.spawn(
-        px, py, pz, _dx * sp, _dy * sp, _dz * sp,
+        px, py, pz, _s[D0] * sp, _s[D1] * sp, _s[D2] * sp,
         rand.range(0.7, 1.4), 0.12, rand.range(0.5, 0.9),
         s[0], s[1], s[2], 1, 1,
         2.0, -0.04, rand.next() * 6.28, rand.range(-0.8, 0.8),
@@ -858,7 +867,7 @@ export function ventPlume(ctx, px, py, pz, dx, dy, dz, strength) {
     cone(rand, dx, dy, dz, 0.5);
     const sp = rand.range(1.5, 4.0) * strength;
     ctx.add.spawn(
-      px, py, pz, _dx * sp, _dy * sp + 0.8, _dz * sp,
+      px, py, pz, _s[D0] * sp, _s[D1] * sp + 0.8, _s[D2] * sp,
       rand.range(0.25, 0.5), 0.035, 0.14,
       c[0], c[1], c[2], 3.0 * B * strength, 0.05 * B,
       2.6, -0.2, rand.next() * 6.28, rand.range(-1.5, 1.5),
@@ -870,7 +879,7 @@ export function ventPlume(ctx, px, py, pz, dx, dy, dz, strength) {
   cone(rand, dx, dy, dz, 0.8);
   const sp2 = rand.range(0.8, 2.2) * strength;
   ctx.alpha.spawn(
-    px, py, pz, _dx * sp2, _dy * sp2 + 1.1, _dz * sp2,
+    px, py, pz, _s[D0] * sp2, _s[D1] * sp2 + 1.1, _s[D2] * sp2,
     rand.range(0.6, 1.2), 0.07, rand.range(0.30, 0.55),
     s[0], s[1], s[2], 1, 1,
     2.2, -0.12, rand.next() * 6.28, rand.range(-1, 1),

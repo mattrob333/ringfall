@@ -26,6 +26,12 @@ export class DecalPool {
     this.cap = cap;
     this.count = 0;
     this._stamp = 0;
+    this._ranges = [
+      { start: 0, count: 0 },
+      { start: 0, count: 0 },
+      { start: 0, count: 0 },
+      { start: 0, count: 0 },
+    ];
     this.replaced = 0; // how many times oldest-out actually fired
     this.peak = 0;
 
@@ -169,20 +175,28 @@ export class DecalPool {
     }
 
     this.geometry.instanceCount = n;
-    this._flush(this.aPos, n * 3);
-    this._flush(this.aNormal, n * 3);
-    this._flush(this.aParams, n * 4);
-    this._flush(this.aColor, n * 4);
+    this._flush(this.aPos, 0, n * 3);
+    this._flush(this.aNormal, 1, n * 3);
+    this._flush(this.aParams, 2, n * 4);
+    this._flush(this.aColor, 3, n * 4);
   }
 
-  _flush(attr, len) {
+  /** See the note on ParticlePool._flush() — cached ranges, zero allocation. */
+  _flush(attr, slot, len) {
     if (len === 0) {
       attr.needsUpdate = false;
       return;
     }
-    if (attr.clearUpdateRanges) {
-      attr.clearUpdateRanges();
-      attr.addUpdateRange(0, len);
+    const r = this._ranges[slot];
+    r.start = 0;
+    r.count = len;
+    // Only re-push when WebGLAttributes cleared the list after its upload.
+    // `length = 0` followed by `push` every frame makes V8 shrink and then
+    // regrow the backing store — measured at 156 bytes of garbage per call.
+    const ur = attr.updateRanges;
+    if (ur.length !== 1 || ur[0] !== r) {
+      ur.length = 0;
+      ur.push(r);
     }
     attr.needsUpdate = true;
   }

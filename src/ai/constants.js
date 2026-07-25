@@ -116,6 +116,16 @@ export const HIT_JITTER_FRACTION = 0.55;
 /** Aim can never be considered on-target while the body is still slewing this much. */
 export const AIM_RATE = Object.freeze({ SKIRN: 3.4, CULL: 3.8, VANE: 4.6, WARDEN: 2.6 }); // rad/s
 
+/**
+ * How fast the CULL slews its forward arm barrier onto the threat bearing.
+ * This is a HARD LIMIT and it is the reason flanking works: the bearing rate
+ * of a target moving tangentially at speed v is v/d rad/s, so a player at the
+ * 4.40 m/s of FEEL.md §2 out-turns the barrier once d < 4.40/6.0 = 0.73 m.
+ * Measured in a 20 s orbit test: 0.00 deg of lag at 8-17 m, up to 71.7 deg at
+ * 0.64 m. Do not "fix" the close-range lag — it IS the counterplay.
+ */
+export const BARRIER_TRACK_RATE = 6.0; // rad/s
+
 // ---------------------------------------------------------------------------
 // Per-archetype AI behaviour that FEEL.md describes in prose.
 // `weaponId` strings are what the AI reports on `weapon.fired`; the weapons

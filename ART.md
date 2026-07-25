@@ -252,7 +252,7 @@ Render each archetype at **60 m**, full body, camera at 1.62 m eye height, flat 
 
 | Gate | Condition |
 | --- | --- |
-| A1 | Each archetype's thresholded mask is ≥ 30 px tall and ≥ 250 px in area (i.e. it is actually visible at 60 m) |
+| A1 | Each archetype's thresholded mask is ≥ **22 px tall** and ≥ **170 px** in area (i.e. it is actually visible at 60 m). **Corrected — see amendment A1 below.** The original 30 px / 250 px floor was arithmetically unreachable: at 1080p with a 55.4° vertical FOV, one metre at 60 m subtends 1080 / (2 · 60 · tan 27.7°) = **17.14 px**, so `FEEL.md` §6's 1.42 m `SKIRN` can only ever be **24.3 px** tall. The floor contradicted the character heights the same spec mandates. |
 | A2 | Threshold: a pixel is figure if its luminance differs from the local sky luminance by > 12% |
 | A3 | Masks are bounding-box normalised to 256×256, then pairwise IoU computed. **Any pair ≥ 0.60 fails the character pass**, regardless of close-up quality |
 | A4 | Aspect ratio (w/h) of the four archetype masks must span a range of at least 0.55 |
@@ -324,5 +324,6 @@ them is an hour taken from silhouette, palette coherence, and light.
 
 | # | Date | Change | Measurement / reason |
 | --- | --- | --- | --- |
-| — | 2026-07-25 | *(v1.0 baseline)* | |
+| A1 | 2026-07-25 | §8 gate A1 minimum mask size lowered from 30 px / 250 px to **22 px / 170 px**. | Arithmetically forced. At the framing §8 itself specifies (60 m, 1080p, 55.4° vFOV) the scale is 17.14 px per metre, so the four archetypes can be at most SKIRN 24.3 px, CULL 30.5 px, VANE 40.1 px, WARDEN 48.9 px. A 30 px floor excludes `SKIRN` at any modelling quality, which makes it a spec conflict with `FEEL.md` §6, not a character defect. The `charart` owner correctly left the gate failing and documented the conflict rather than loosening it silently. New floor is set below `SKIRN`'s achievable 24.3 px with margin. |
+| A2 | 2026-07-25 | Recorded ceiling: violet emissives must stay below post-exposure luminance **1.22**. | ART.md §3.3 permits emissive up to 8× adjacent diffuse (≈2.7 post-exposure), but measured crossover for P4's S ≥ 0.25 floor is violet 1.22, mint 3.54, and cyan/orange/yellow never. This is a display-gamut property: a hue whose maximum-luminance form is dark desaturates on clamp. Shipped violet runs at L=0.40 (S=0.496) so nothing violates it today. Logged as `DEFECTS.md` ART3. |
 </content>

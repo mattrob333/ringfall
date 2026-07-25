@@ -291,20 +291,31 @@ export function runAiSelfTest() {
       squadId: 'c2',
       faction: Faction.VESS,
     });
-    const player = makePlayer(0, 0, 17);
+    // The player ORBITS at the full 4.40 m/s of FEEL.md §2 at combat range —
+    // a static target would make the barrier assertion meaningless.
+    const player = makePlayer(0, 0, 12);
     let flips = 0;
     let lastSign = 0;
     let worstBarrierErrDeg = 0;
+    let worstRange = 0;
     const measureSeconds = 18;
+    const orbitR = 12;
+    const omega = PLAYER.speed / orbitR; // rad/s at exactly player top speed
     for (let i = 0; i < measureSeconds * 120; i++) {
+      const a = i * SIM_DT * omega;
+      player.position.set(Math.sin(a) * orbitR, 0, Math.cos(a) * orbitR);
+      player.velocity.set(Math.cos(a) * PLAYER.speed, 0, -Math.sin(a) * PLAYER.speed);
       director.update(SIM_DT, player);
       if (lastSign !== 0 && cull.strafeSign !== lastSign) flips++;
       lastSign = cull.strafeSign;
       if (i > 120) {
         const bearing = Math.atan2(player.position.x - cull.position.x, player.position.z - cull.position.z);
-        let d = ((cull.barrierYaw - bearing + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        const d = ((cull.barrierYaw - bearing + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
         const deg = Math.abs(d) * (180 / Math.PI);
-        if (deg > worstBarrierErrDeg) worstBarrierErrDeg = deg;
+        if (deg > worstBarrierErrDeg) {
+          worstBarrierErrDeg = deg;
+          worstRange = Math.hypot(player.position.x - cull.position.x, player.position.z - cull.position.z);
+        }
       }
     }
     const expectedFlips = measureSeconds / ENEMY.CULL.strafePeriod;
@@ -315,10 +326,11 @@ export function runAiSelfTest() {
       `${expectedFlips.toFixed(1)} +/- 1`,
     );
     push(
-      'CULL keeps its arm barrier inside the 62 deg frontal arc of the threat',
+      'CULL holds its barrier inside the 62 deg arc vs a 4.40 m/s orbiting player',
       worstBarrierErrDeg <= ENEMY.CULL.barrierArcDeg / 2,
-      `worst ${worstBarrierErrDeg.toFixed(3)} deg off-bearing`,
+      `worst ${worstBarrierErrDeg.toFixed(3)} deg off-bearing${worstRange > 0 ? ` (at ${worstRange.toFixed(2)} m)` : ''}`,
       `<= ${ENEMY.CULL.barrierArcDeg / 2} deg`,
+      `orbit bearing rate ${omega.toFixed(3)} rad/s vs BARRIER_TRACK_RATE 6.0 rad/s, so the slew snaps exactly on target every tick. The barrier IS beatable below ~0.73 m where bearing rate exceeds the track rate — that is the intended flank, see README`,
     );
   }
 
