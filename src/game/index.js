@@ -276,7 +276,15 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
   let frames = 0;
   function oneFrame(dtOverride) {
     const dt = dtOverride ?? clock.frameDt ?? 1 / 60;
-    capture.sample(dt);
+    // In deterministic capture the HARNESS owns the InputState. Sampling the
+    // real keyboard here overwrote every scripted axis with the empty key set
+    // (s.fire = keys.has('fire') = false), so the player's trigger never
+    // registered and playtest's 919 "shots" were entirely AI weapons — the
+    // player fired nothing and no player raycast was ever issued.
+    if (!DETERMINISTIC) capture.sample(dt);
+    // Scripted gameplay for tools/profile.mjs. Runs AFTER sample() so it wins,
+    // for exactly the reason above.
+    if (window.__ringfall?._profileTick) window.__ringfall._profileTick(dt);
     clock.tick(step);
     present(clock.frameDt || 1 / 60);
     input.endFrame();

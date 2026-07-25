@@ -50,12 +50,73 @@ target. They are the reason for several of the rules in `ARCHITECTURE.md` §0.
 
 ---
 
-## Phase 1 — Harness before game
+## Phase 1 / 2 — What actually happened
 
-*(not started)*
+The brief's phase boundary was not respected. The harness was built *alongside* the render
+pipeline rather than fully before it, because the 12-shot camera set is meaningless until there
+is a level to point it at. Determinism was verified 3× only at the end rather than as an entry
+gate. **This is a real deviation** and it carried real risk: had capture drifted, every visual
+comparison made during the build would have been suspect. It did not drift, but that was luck
+rather than process.
 
----
+### The single most valuable result: tools caught defects in the specification
 
-## Phase 2 — Vertical slice, then subsystems
+Six defects were found by a tool rather than by looking. **Four of them were defects in my own
+specification or my own tooling, not in the code they accused.**
 
-*(not started)*
+| # | What the tool said | What was actually wrong | Measurement |
+| --- | --- | --- | --- |
+| 1 | Every palette gate reads 0.000 | `readPixels` in a separate `page.evaluate()` returns an already-presented, cleared framebuffer. `preserveDrawingBuffer` is not enough. | 3,686,400 bytes captured, **0** non-zero |
+| 2 | P4 highlight saturation fails on 11 of 12 shots | The gate sampled the 20 brightest pixels, which in an exterior shot are the **sun disc** — legitimately near-white at S=0.14. It measured scene content, not the tonemap. | `ext_vista` "passed" at 0.492 purely because its brightest pixels happened to be sky. Noise, not signal. |
+| 3 | Three subsystems use banned `Math.random()` / `Date.now()` | All three hits were inside **comments promising not to use them**. | 0 real violations in 96 files |
+| 4 | `SKIRN` fails the A1 minimum-size gate | At the framing `ART.md` §8 itself specifies, one metre at 60 m is 17.14 px, so `FEEL.md` §6's 1.42 m SKIRN can never exceed **24.3 px** against a 30 px floor. The spec contradicted itself. | Gate corrected to 22 px, derivation recorded as ART.md amendment A1 |
+| 5 | F23 Ember TTK 2.80 vs 2.93 | 22 rounds is **21** intervals. I multiplied by 22. | 21 × 0.1333 = 2.800 s |
+| 6 | F34 frag lethal radius 2.23 vs 2.7 | 2.7 came from a **linear** falloff and omitted the `EXPLOSIVE` ×1.15 multiplier, contradicting the exponent 1.6 in the table directly above it. | 5.5·(1 − 0.4348^(1/1.6)) = 2.232 m, matching the implementation to 5 decimals |
+
+Without the measurement layer, four of these would have been "fixed" by changing working code.
+**That is the headline result of the whole exercise.**
+
+### Orchestration: what worked
+
+| Pattern | Outcome |
+| --- | --- |
+| **Sequential single owner for coupled visual systems** (sky + exposure + tonemap + bloom + indirect as ONE agent, working alone) | Held. Exposure was changed exactly twice, both times against a whole-scene measurement with a written derivation, and never in response to one object looking wrong. |
+| **Parallel fan-out for genuinely decoupled subsystems** | 8 agents across physics, audio, ui, ai, fx, vehicles, characters, weapons. Zero cross-directory write conflicts, because ownership was one directory per agent with no exceptions. |
+| **Requiring every agent to run its own self-test and report REAL numbers** | Every agent found bugs in its own code that inspection would not have: physics found a 2× movement-speed bug in slide-and-clip; sandbox found jumps that never left the floor (apex 0.001 m) and a charge accumulator landing on 1.1999999999999997 that silently downgraded an EMP bolt to a plasma shot; AI found the CULL barrier tracking its movement heading instead of the threat bearing. |
+| **Agents filing `DEFECTS.md` rows against other owners instead of reaching in** | Produced the two highest-value cross-cutting finds. The `vehicles` owner diagnosed a wrong-hit-normal bug in `rayObb` it did not own, compensated with a logged `// COMPENSATION:`, and filed it. That one bug was also silently breaking character ground detection — the player was never grounded (588 jumps, 1 landing). Fixing it upstream fixed both, and the compensation was then removed. |
+| **`CONTRADICTION.md` with evidence** | The sandbox owner refused to loosen two failing tolerances, derived that the spec was wrong in both cases, and proposed corrections. Both were correct. |
+
+### Orchestration: what did not work
+
+* **Three different result shapes for self-tests.** I specified `{passed, failed, results}` but not
+  precisely enough, and three agents chose three interpretations (`passed` as a count, as a
+  boolean, and `failed` as an array). The aggregator misread a *passing* character suite as
+  "0 pass / 4 fail" until it normalised all three. Cost: two debugging cycles on a non-problem.
+* **A missing injection contract went unnoticed for the whole build.** `runSandboxSelfTest`
+  needed the player suite passed in, because `src/weapons` and `src/player` are both L5 and the
+  lattice bans sideways imports. Called bare it reported 20 assertions as `skipped`. I only
+  discovered this from the agent's final report. **Coverage went from 29/55 to 49/55 assertions
+  the moment it was wired.** An aggregator that reports uncovered assertions loudly is what made
+  this visible at all — a silent aggregator would have shipped claiming a pass.
+* **The four-critic protocol in `ARCHITECTURE.md` §11 was never run.** No round-by-round defect
+  ledger with counts, no round reverted for raising defect count. Defects were fixed continuously
+  against measurements instead. The rubric exists in the document; the process it describes did
+  not happen, and `HONEST_ASSESSMENT.md` says so.
+* **Two damage resolvers.** `ARCHITECTURE.md` §4.1 named three emitters for `damage.applied`.
+  That contract error let `weapons` and `ai` both resolve damage, which bypassed the CULL
+  barrier — measured as a front-arc shot taking health 55 → 0 where the spec requires 0 damage.
+  The `ai` owner compensated correctly and logged it, but `entity.killed` still double-fires
+  (measured 2× over a 5 s burst). **A shared contract needs exactly one owner per responsibility,
+  and I did not write it that way.**
+
+### Numbers
+
+| Metric | Value |
+| --- | --- |
+| Subagents run | 8 |
+| Files under `src/` | 96 |
+| Feel assertions passing | 120/120 |
+| Palette gates passing | 10/12 |
+| Defects logged | 16, of which 4 closed |
+| Compensations outstanding | 1 (`AI4-C`, dual damage resolver) |
+| Compensations removed after upstream fix | 1 (`VEH1-C`) |

@@ -11,9 +11,17 @@
 import path from 'node:path';
 import { ARTIFACTS, writeJson, fmt, PASS, FAIL, WARN } from './lib.mjs';
 
+// The sandbox suite covers FEEL.md F01-F17 (locomotion, shields, health) only
+// when the player suite is INJECTED into it. src/weapons may not statically
+// import src/player — both are L5, and ARCHITECTURE.md §3 bans sideways
+// imports — so the dependency is passed in here by the orchestrator, which is
+// the one layer allowed to know about both. Called bare, it silently reports
+// those 20 assertions as `skipped`, which is how they went uncovered.
+const { runPlayerSelfTest } = await import('../src/player/selftest.js');
+
 const SUITES = [
   { name: 'physics', mod: '../src/physics/selftest.js', fn: 'runPhysicsSelfTest' },
-  { name: 'sandbox', mod: '../src/weapons/selftest.js', fn: 'runSandboxSelfTest' },
+  { name: 'sandbox', mod: '../src/weapons/selftest.js', fn: 'runSandboxSelfTest', deps: { runPlayerSelfTest } },
   { name: 'ai', mod: '../src/ai/selftest.js', fn: 'runAiSelfTest' },
   { name: 'vehicles', mod: '../src/vehicles/selftest.js', fn: 'runVehicleSelfTest' },
   { name: 'characters', mod: '../src/characters/selftest.js', fn: 'runCharacterSelfTest' },
@@ -34,7 +42,7 @@ for (const suite of SUITES) {
       hardFail = true;
       continue;
     }
-    result = await fn();
+    result = await fn(suite.deps);
   } catch (err) {
     suiteSummary.push({
       name: suite.name,

@@ -57,12 +57,9 @@ const _com = new Vector3();
 const _to = new Vector3();
 const _right = new Vector3();
 const _up = new Vector3();
-const _p0 = new Vector3();
-const _p1 = new Vector3();
 const _hitPoint = new Vector3();
 const _hitNormal = new Vector3();
 const _tmp = new Vector3();
-const _tmpB = new Vector3();
 const _disc = [0, 0];
 const WORLD_UP = new Vector3(0, 1, 0);
 const WORLD_X = new Vector3(1, 0, 0);
@@ -1367,7 +1364,9 @@ export class WeaponSystem {
       }
 
       rec.fuse -= dt;
-      if (rec.fuse <= 0) {
+      // 1e-9 slack: 360 repeated subtractions of 1/120 leave ~1e-15 on the
+      // clock, which otherwise costs one whole extra tick of fuse.
+      if (rec.fuse <= 1e-9) {
         this._detonate(rec);
         this.liveGrenades.splice(i, 1);
       }

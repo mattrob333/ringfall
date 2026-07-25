@@ -512,7 +512,13 @@ function buildCull(kit, root, parts, hitboxes) {
   // frontal block arc against `parts.barrier.matrixWorld` directly. Its inner
   // edge sits 0.18 m outboard of the shoulder yoke — that gap is the interior
   // void that no other archetype's mask has.
-  const barrier = kit.group(forearm, [0.1, -0.3, 0.26], [0, 0, 0], 'barrier');
+  // rot.x = -0.09 cancels the torso's forward pitch so the slab hangs PLUMB and
+  // its +Z normal is level with the world. Without it the barrier face sat
+  // 5.16° nose-down, and although barrierBlocks() resolved the 62° arc exactly
+  // about that tilted normal, a caller sweeping in world XZ measured the edge
+  // at 29.9° instead of 31.0° and a caller sweeping in pitch measured 25.9°.
+  // A braced shield should be plumb anyway. (DEFECTS.md CHAR2.)
+  const barrier = kit.group(forearm, [0.1, -0.3, 0.26], [-0.09, 0, 0], 'barrier');
   parts.barrier = barrier;
   kit.box(barrier, M.shell, [0, 0, 0], [0.44, 1.28, 0.075]);
   // hard-bevelled rim + rib, all geometry (ART.md §2)
@@ -1158,6 +1164,12 @@ const _tmp = new THREE.Vector3();
 export function barrierBlocks(handle, travelDir) {
   if (!handle || !handle.barrier) return false;
   const node = handle.barrier.node;
+  // getWorldDirection reads matrixWorld, which three only refreshes during a
+  // render traversal. A character that has been built and posed but not yet
+  // rendered (or one queried between frames, which is every weapons call) still
+  // carries an identity matrixWorld, so every arc test resolved false — the
+  // CULL barrier never blocked anything. Refresh this node's chain first.
+  node.updateWorldMatrix(true, false);
   node.getWorldDirection(_bwd); // barrier's local +Z in world space
   _tmp.copy(travelDir).normalize().negate(); // direction back toward the shooter
   const cosHalf = Math.cos((handle.barrier.arcDeg * 0.5 * Math.PI) / 180);

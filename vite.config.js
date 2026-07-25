@@ -6,10 +6,8 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks: { three: ['three'] },
-      },
-    },
+    // No manualChunks: vite 8 builds with rolldown, which rejects the object
+    // form ("manualChunks is not a function"). There is one entry point and one
+    // real dependency, so splitting bought nothing anyway.
   },
 });

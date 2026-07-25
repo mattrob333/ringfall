@@ -35,9 +35,21 @@
 // change made to hit them was a change to the geometry.
 
 import * as THREE from 'three';
-import { LAYER_TRANSPARENT } from '../render/index.js';
+import { LAYER_TRANSPARENT, LAYER_VIEWMODEL } from '../render/index.js';
 import { createMaterial, Family, bindGlobals } from '../materials/index.js';
-import { buildCharacter, countTriangles } from './index.js';
+import {
+  buildCharacter,
+  countTriangles,
+  animateCharacter,
+  barrierBlocks,
+  setShieldState,
+} from './index.js';
+import {
+  buildViewModel,
+  animateViewModel,
+  setAmmoCounter,
+  VIEWMODEL_IDS,
+} from './viewmodels.js';
 
 // --- ART.md §8 framing ------------------------------------------------------
 export const FRAME = Object.freeze({
@@ -62,6 +74,7 @@ export const GATE = Object.freeze({
   a4MinAspectSpread: 0.55,
   a5MaxIoU: 0.68,
   maxTriangles: 3500, // ART.md §10 / ARCHITECTURE.md §10
+  maxViewModelTriangles: 4000, // ART.md §10 / ARCHITECTURE.md §10
 });
 
 const ORDER = ['SKIRN', 'CULL', 'VANE', 'WARDEN'];
@@ -233,6 +246,200 @@ export function maskToAscii(mask, n, cols = 48) {
 }
 
 // ---------------------------------------------------------------------------
+// Rig / animation soundness. Procedural animation has no clips to eyeball, so
+// the only honest check is that it stays finite and actually moves things.
+// ---------------------------------------------------------------------------
+const _wp = new THREE.Vector3();
+
+function exerciseCharacter(handle) {
+  const phases = [
+    { state: 'idle', speed: 0 },
+    { state: 'walk', speed: handle.gait.refSpeed },
+    { state: 'walk', speed: handle.gait.refSpeed * 0.4 },
+    { state: 'stagger', speed: 0 },
+    { state: 'death', speed: 0 },
+  ];
+  let nonFinite = 0;
+  let moved = 0;
+  const before = new Map();
+  handle.root.updateMatrixWorld(true);
+  handle.root.traverse((o) => {
+    if (o.isMesh) before.set(o, o.getWorldPosition(new THREE.Vector3()).clone());
+  });
+  for (const ph of phases) {
+    for (let i = 0; i < 90; i++) {
+      animateCharacter(handle, {
+        state: ph.state,
+        dt: 1 / 120,
+        speed: ph.speed,
+        aimYaw: Math.sin(i * 0.07) * 1.1,
+        aimPitch: Math.cos(i * 0.05) * 0.6,
+      });
+    }
+    handle.root.updateMatrixWorld(true);
+    handle.root.traverse((o) => {
+      if (!o.isMesh) return;
+      o.getWorldPosition(_wp);
+      if (!Number.isFinite(_wp.x + _wp.y + _wp.z)) nonFinite++;
+      const b = before.get(o);
+      if (b && b.distanceTo(_wp) > 1e-4) moved++;
+    });
+  }
+  return { nonFinite, moved };
+}
+
+/**
+ * ±(arcDeg/2) about the barrier normal, sampled either side of the edge.
+ * Runs a full second of idle first: aim tracking is exponentially damped, so a
+ * single dt = 0 tick would leave the barrier still yawed by whatever the
+ * previous animation phase asked for. Settling proves the rest pose is
+ * recovered, which is the property `weapons` actually depends on.
+ */
+function checkBarrierArc(handle) {
+  for (let i = 0; i < 120; i++) {
+    animateCharacter(handle, { state: 'idle', dt: 1 / 120, speed: 0, aimYaw: 0, aimPitch: 0 });
+  }
+  const half = handle.barrier.arcDeg * 0.5;
+
+  // Sample relative to the barrier's ACTUAL world normal, not to world -Z.
+  // Idle breathing rocks the torso ±0.018 rad and the braced arm inherits it,
+  // so a world-axis sample 1° inside the edge flickers across the boundary —
+  // that is the pose moving, not the arc arithmetic being wrong. Building an
+  // orthonormal basis on the live normal makes the sampled angle exact.
+  const n = new THREE.Vector3();
+  handle.barrier.node.getWorldDirection(n).normalize();
+  const t = new THREE.Vector3(0, 1, 0).cross(n);
+  if (t.lengthSq() < 1e-6) t.set(1, 0, 0);
+  t.normalize();
+  const dir = new THREE.Vector3();
+  const at = (deg) => {
+    const r = (deg * Math.PI) / 180;
+    // direction of TRAVEL = away from a shooter standing at `deg` off the normal
+    dir.copy(n).multiplyScalar(Math.cos(r)).addScaledVector(t, Math.sin(r)).negate();
+    return barrierBlocks(handle, dir);
+  };
+  return {
+    arcDeg: handle.barrier.arcDeg,
+    onAxis: at(0),
+    insideEdge: at(half - 0.5),
+    outsideEdge: at(half + 0.5),
+    side: at(90),
+    behind: at(180),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// View models — ART.md §6 structural requirements and the §10 budget.
+// ---------------------------------------------------------------------------
+const REQUIRED_VM_PARTS = ['body', 'magazine', 'bolt', 'counter', 'muzzle'];
+
+export function runViewModelSelfTest() {
+  ensureMaterialsBound();
+  const out = [];
+  const failed = [];
+
+  for (const id of VIEWMODEL_IDS) {
+    const h = buildViewModel(id);
+    h.root.updateMatrixWorld(true);
+
+    let meshes = 0;
+    let offLayer = 0;
+    h.root.traverse((o) => {
+      if (!o.isMesh) return;
+      meshes++;
+      if ((o.layers.mask & (1 << LAYER_VIEWMODEL)) === 0) offLayer++;
+    });
+
+    const missing = REQUIRED_VM_PARTS.filter((k) => !h.parts[k]);
+    // muzzleTip must actually hang off the model, not float free
+    let tipAttached = false;
+    h.root.traverse((o) => {
+      if (o === h.muzzleTip) tipAttached = true;
+    });
+
+    // The counter must actually change what it SHOWS. Counting lit meshes is
+    // not enough: on a one-digit display "6" and "0" both light six segments,
+    // so compare the visibility pattern instead.
+    const patternFor = (v) => {
+      setAmmoCounter(h, v);
+      let s = '';
+      h.parts.counter.traverse((o) => {
+        if (o.isMesh) s += o.visible ? '1' : '0';
+      });
+      return s;
+    };
+    const seen = new Set();
+    for (const v of [h.capacity, Math.floor(h.capacity / 2), 1, 0]) seen.add(patternFor(v));
+    const counterResponds = seen.size >= 3;
+    setAmmoCounter(h, h.capacity);
+
+    let nonFinite = 0;
+    const seq = [
+      { firing01: 0, recoil01: 0, reload01: 0, swap01: 1, heat01: 0, charge01: 0 },
+      { firing01: 1, recoil01: 1, reload01: 0, swap01: 1, heat01: 0.6, charge01: 0 },
+      { firing01: 0, recoil01: 0, reload01: 0.3, swap01: 1, heat01: 1, charge01: 0.5 },
+      { firing01: 0, recoil01: 0, reload01: 0.85, swap01: 1, heat01: 0.1, charge01: 1 },
+      { firing01: 0, recoil01: 0, reload01: 0, swap01: 0, heat01: 0, charge01: 0 },
+    ];
+    // magazine travel over a full reload, which is the FEEL.md §7 "reload state
+    // readable from the view model alone" requirement
+    let magTravel = 0;
+    const magRef = new THREE.Vector3();
+    animateViewModel(h, { ...seq[0], dt: 1 / 120 });
+    h.root.updateMatrixWorld(true);
+    h.parts.magazine.getWorldPosition(magRef);
+    for (const s of seq) {
+      for (let i = 0; i < 60; i++) animateViewModel(h, { ...s, dt: 1 / 120 });
+      h.root.updateMatrixWorld(true);
+      h.root.traverse((o) => {
+        if (!o.isMesh) return;
+        o.getWorldPosition(_wp);
+        if (!Number.isFinite(_wp.x + _wp.y + _wp.z)) nonFinite++;
+      });
+      if (s.reload01 > 0 && s.reload01 < 0.4) {
+        h.parts.magazine.getWorldPosition(_wp);
+        magTravel = Math.max(magTravel, magRef.distanceTo(_wp));
+      }
+    }
+
+    const bbox = new THREE.Box3().setFromObject(h.root);
+    const size = bbox.getSize(new THREE.Vector3());
+
+    const r = {
+      weaponId: id,
+      triangles: h.triangles,
+      meshes,
+      capacity: h.capacity,
+      counterKind: h.parts.counter.userData.kind,
+      counterResponds,
+      isVess: h.isVess,
+      hasDetachableMag: h.hasDetachableMag,
+      muzzleTipLocal: [h.muzzleTip.position.x, h.muzzleTip.position.y, h.muzzleTip.position.z],
+      lengthM: size.z,
+      heightM: size.y,
+      widthM: size.x,
+      magDropM: magTravel,
+      budgetOk: h.triangles < GATE.maxViewModelTriangles,
+      layerOk: offLayer === 0,
+      partsOk: missing.length === 0 && tipAttached,
+      finite: nonFinite === 0,
+    };
+    out.push(r);
+
+    if (!r.budgetOk) failed.push(`VM BUDGET ${id}: ${h.triangles} tris (limit ${GATE.maxViewModelTriangles})`);
+    if (!r.layerOk) failed.push(`VM LAYER ${id}: ${offLayer} meshes not on LAYER_VIEWMODEL`);
+    if (missing.length) failed.push(`VM PARTS ${id}: missing ${missing.join(', ')}`);
+    if (!tipAttached) failed.push(`VM PARTS ${id}: muzzleTip is not attached to root`);
+    if (!counterResponds) failed.push(`VM COUNTER ${id}: display shows only ${seen.size} distinct patterns across 4 values`);
+    if (!r.finite) failed.push(`VM ANIM ${id}: ${nonFinite} non-finite world positions`);
+    if (h.hasDetachableMag && magTravel < 0.05) {
+      failed.push(`VM RELOAD ${id}: magazine moved only ${magTravel.toFixed(3)} m during the drop`);
+    }
+  }
+  return { passed: failed.length === 0, failed, results: out };
+}
+
+// ---------------------------------------------------------------------------
 // The gate
 // ---------------------------------------------------------------------------
 
@@ -293,9 +500,24 @@ export function runCharacterSelfTest(opts = {}) {
       widthPx,
       areaPx,
       hitboxes: h.hitboxes.length,
+      regions: h.hitboxes.reduce((m, hb) => {
+        m[hb.region] = (m[hb.region] || 0) + 1;
+        return m;
+      }, {}),
       a1: heightPx >= GATE.a1MinHeightPx && areaPx >= GATE.a1MinAreaPx,
       budgetOk: h.triangles < GATE.maxTriangles,
     };
+    r.anim = exerciseCharacter(h);
+    if (h.barrier) r.barrier = checkBarrierArc(h);
+    if (h.shield) {
+      setShieldState(h, { fraction: 1, flash01: 1 });
+      r.shieldFlashIntensity = h.shield.material.uniforms.uEmissiveIntensity.value;
+      setShieldState(h, { fraction: 1, flash01: 0 });
+      h.anim.shieldFlash = 0;
+      setShieldState(h, { fraction: 1 });
+      r.shieldRestIntensity = h.shield.material.uniforms.uEmissiveIntensity.value;
+      r.shieldAdditive = h.shield.material.blending === THREE.AdditiveBlending;
+    }
     if (opts.ascii) r.ascii = maskToAscii(mask, MASK_N);
     results.push(r);
   }
@@ -338,6 +560,39 @@ export function runCharacterSelfTest(opts = {}) {
 
   const separationPassed = a3Fails.length === 0 && a4Ok && a5Fails.length === 0;
 
+  // ---- rig soundness ------------------------------------------------------
+  for (const r of results) {
+    if (r.anim.nonFinite > 0) {
+      failed.push(`RIG ${r.archetype}: ${r.anim.nonFinite} non-finite world positions during animation`);
+    }
+    if (r.anim.moved === 0) {
+      failed.push(`RIG ${r.archetype}: animation moved nothing`);
+    }
+    if (r.barrier) {
+      const b = r.barrier;
+      if (!(b.onAxis && b.insideEdge && !b.outsideEdge && !b.side && !b.behind)) {
+        failed.push(
+          `BARRIER CULL: ${b.arcDeg} deg arc mis-resolves — ` +
+            `onAxis=${b.onAxis} inside=${b.insideEdge} outside=${b.outsideEdge} ` +
+            `side=${b.side} behind=${b.behind}`,
+        );
+      }
+    }
+    if (r.shieldRestIntensity !== undefined) {
+      if (!(r.shieldFlashIntensity > r.shieldRestIntensity * 2)) {
+        failed.push(
+          `SHIELD VANE: flash ${r.shieldFlashIntensity.toFixed(2)} is not clearly above ` +
+            `rest ${r.shieldRestIntensity.toFixed(2)}`,
+        );
+      }
+      if (!r.shieldAdditive) failed.push('SHIELD VANE: shell is not additively blended');
+    }
+  }
+
+  // ---- view models --------------------------------------------------------
+  const vm = opts.viewModels === false ? null : runViewModelSelfTest();
+  if (vm) for (const f of vm.failed) failed.push(f);
+
   if (results.some((r) => !r.a1)) {
     notes.push(
       'A1 measures the real §8 framing (17.14 px/m at 60 m). The ceiling per archetype is ' +
@@ -361,7 +616,10 @@ export function runCharacterSelfTest(opts = {}) {
       a4: a4Ok,
       a5: a5Fails.length === 0,
       budget: results.every((r) => r.budgetOk),
+      rig: results.every((r) => r.anim.nonFinite === 0 && r.anim.moved > 0),
+      viewModels: vm ? vm.passed : null,
     },
+    viewModels: vm ? vm.results : null,
     framing: { pxPerMetre: PX_PER_M, ...FRAME },
     notes,
   };
@@ -392,6 +650,35 @@ export function formatSelfTest(res) {
   }
   L.push('');
   L.push(`A4 aspect spread ${res.aspectSpread.toFixed(3)} (need >= 0.55) ${res.gates.a4 ? 'ok' : 'FAIL'}`);
+  L.push('');
+  L.push('rig / hitboxes:');
+  for (const r of res.results) {
+    let s =
+      `  ${r.archetype.padEnd(7)} hitboxes ${String(r.hitboxes).padStart(2)}  ` +
+      `nonFinite ${r.anim.nonFinite}  movedParts ${String(r.anim.moved).padStart(4)}`;
+    if (r.barrier) {
+      s += `  barrier ${r.barrier.arcDeg}deg on=${r.barrier.onAxis} in=${r.barrier.insideEdge} out=${r.barrier.outsideEdge} side=${r.barrier.side}`;
+    }
+    if (r.shieldRestIntensity !== undefined) {
+      s += `  shield rest ${r.shieldRestIntensity.toFixed(2)} -> flash ${r.shieldFlashIntensity.toFixed(2)} additive=${r.shieldAdditive}`;
+    }
+    L.push(s);
+  }
+  if (res.viewModels) {
+    L.push('');
+    L.push('view models (budget < 4000 tris, ART.md §6 parts, LAYER_VIEWMODEL):');
+    L.push('  weapon           tris  meshes  len(m)  counter   magDrop  budget layer parts finite');
+    for (const v of res.viewModels) {
+      L.push(
+        `  ${v.weaponId.padEnd(15)} ${String(v.triangles).padStart(4)}  ` +
+          `${String(v.meshes).padStart(6)}  ${v.lengthM.toFixed(3).padStart(6)}  ` +
+          `${v.counterKind.padEnd(7)}  ${v.magDropM.toFixed(3).padStart(7)}  ` +
+          `${(v.budgetOk ? 'ok' : 'FAIL').padStart(6)} ${(v.layerOk ? 'ok' : 'FAIL').padStart(5)} ` +
+          `${(v.partsOk ? 'ok' : 'FAIL').padStart(5)} ${(v.finite ? 'ok' : 'FAIL').padStart(6)}`,
+      );
+    }
+  }
+  L.push('');
   L.push(`gates: ${JSON.stringify(res.gates)}`);
   L.push(`separationPassed (A3+A4+A5): ${res.separationPassed}`);
   if (res.failed.length) {
