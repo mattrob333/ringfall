@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Ringfall</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; overflow: hidden; background: #05080a; }
+      #stage { position: fixed; inset: 0; }
+      #gl, #hud { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+      #hud { pointer-events: none; }
+      #boot {
+        position: fixed; inset: 0; display: grid; place-items: center;
+        background: #05080a; color: #7fe3c8; z-index: 10;
+        font: 500 14px/1.6 ui-monospace, monospace; letter-spacing: 0.18em;
+        transition: opacity 0.4s ease; text-align: center;
+      }
+      #boot.hidden { opacity: 0; pointer-events: none; }
+      #boot b { display: block; font-size: 30px; letter-spacing: 0.4em; margin-bottom: 18px; font-weight: 600; }
+      #boot small { display: block; margin-top: 20px; opacity: 0.55; letter-spacing: 0.1em; }
+      #err {
+        position: fixed; inset: auto 0 0 0; max-height: 45%; overflow: auto; z-index: 20;
+        background: #2a0d0d; color: #ffb4a4; font: 12px/1.5 ui-monospace, monospace;
+        padding: 12px 16px; white-space: pre-wrap; display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <canvas id="gl"></canvas>
+      <canvas id="hud"></canvas>
+    </div>
+    <div id="boot"><span><b>RINGFALL</b>INITIALISING<small>click to play &middot; wasd move &middot; space jump</small></span></div>
+    <pre id="err"></pre>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

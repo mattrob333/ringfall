@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ringfall — Audio Demo Harness</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    background: #14161a;
+    color: #d9dde2;
+    margin: 0;
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: #8fa0b3; margin: 28px 0 10px; }
+  p.sub { color: #8b939c; margin: 0 0 20px; font-size: 13px; }
+  #status {
+    display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 13px; font-weight: 600;
+    background: #3a2020; color: #ff8a7a;
+  }
+  #status.ready { background: #16321f; color: #7fe3a0; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  button {
+    background: #21252b; color: #d9dde2; border: 1px solid #363c44; border-radius: 6px;
+    padding: 8px 12px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { background: #2b3038; border-color: #4a525c; }
+  button:active { background: #171a1e; }
+  button.big { background: #2a4a3a; border-color: #3f6d54; font-weight: 600; }
+  button.big:hover { background: #33593f; }
+  .sliders { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .sliders label { font-size: 12px; color: #a9b2bc; display: flex; flex-direction: column; gap: 4px; }
+  #log {
+    margin-top: 24px; height: 160px; overflow-y: auto; background: #0e1013; border: 1px solid #262b31;
+    border-radius: 6px; padding: 8px 10px; font: 12px/1.5 ui-monospace, monospace; color: #7fb0d9;
+    white-space: pre-wrap;
+  }
+  .voiceCount { font-size: 12px; color: #8b939c; margin-top: 6px; }
+  hr { border: none; border-top: 1px solid #262b31; margin: 24px 0; }
+</style>
+</head>
+<body>
+
+<h1>Ringfall — Audio Demo Harness</h1>
+<p class="sub">
+  src/audio's own test harness. One button per synthesized cue, using only WebAudio primitives —
+  no audio files. Click "Init Audio" first (WebAudio requires a user gesture).
+</p>
+
+<div class="row">
+  <button class="big" id="initBtn">Init Audio</button>
+  <span id="status">not initialized</span>
+  <button id="panicBtn">Panic (stop all)</button>
+  <button id="suspendBtn">Suspend</button>
+  <button id="resumeBtn">Resume</button>
+</div>
+<div class="voiceCount" id="voiceCount"></div>
+
+<div class="sliders">
+  <label>Master <input type="range" id="masterVol" min="0" max="1" step="0.01" value="1" /></label>
+  <label>sfx <input type="range" class="busVol" data-bus="sfx" min="0" max="1" step="0.01" value="1" /></label>
+  <label>weapons <input type="range" class="busVol" data-bus="weapons" min="0" max="1" step="0.01" value="1" /></label>
+  <label>world <input type="range" class="busVol" data-bus="world" min="0" max="1" step="0.01" value="1" /></label>
+  <label>ui <input type="range" class="busVol" data-bus="ui" min="0" max="1" step="0.01" value="1" /></label>
+  <label>voice <input type="range" class="busVol" data-bus="voice" min="0" max="1" step="0.01" value="1" /></label>
+</div>
+
+<hr />
+
+<h2>Weapon fire (one voice per weapon id)</h2>
+<div class="row" id="weapons"></div>
+
+<h2>Vess Sidearm charge (whine → release)</h2>
+<div class="row">
+  <button data-charge="start">charge start</button>
+  <button data-charge="full">charge full</button>
+  <button data-charge="released">charge released (fire)</button>
+</div>
+
+<h2>Weapon handling</h2>
+<div class="row" id="handling"></div>
+
+<h2>Scope</h2>
+<div class="row">
+  <button data-scope="enter2">scope enter (2x)</button>
+  <button data-scope="enter8">scope enter (8x)</button>
+  <button data-scope="exit2">scope exit (2x)</button>
+  <button data-scope="exit8">scope exit (8x)</button>
+  <button data-scope="descope">descoped (forced)</button>
+</div>
+
+<h2>Surface impacts (surface.impact, one per SurfaceId)</h2>
+<div class="row" id="impacts"></div>
+
+<h2>Shields</h2>
+<div class="row">
+  <button data-shield="broken-player">shield.broken — player</button>
+  <button data-shield="broken-enemy">shield.broken — enemy</button>
+  <button data-shield="recharge-start-player">recharge.start — player</button>
+  <button data-shield="recharge-start-enemy">recharge.start — enemy</button>
+  <button data-shield="recharge-full-player">recharge.full — player</button>
+  <button data-shield="recharge-full-enemy">recharge.full — enemy</button>
+</div>
+
+<h2>Grenades</h2>
+<div class="row">
+  <button data-grenade="bounce-soft">bounced (soft, dirt)</button>
+  <button data-grenade="bounce-hard">bounced (hard, metal)</button>
+  <button data-grenade="stuck">stuck (adhesive zap)</button>
+  <button data-grenade="detonate-frag">detonated — frag</button>
+  <button data-grenade="detonate-plasma">detonated — plasma</button>
+  <button data-grenade="tick-far">proximity tick (far)</button>
+  <button data-grenade="tick-near">proximity tick (near)</button>
+</div>
+
+<h2>Melee</h2>
+<div class="row">
+  <button data-melee="swing">swing whoosh</button>
+  <button data-melee="landed">landed</button>
+  <button data-melee="assassination">landed — assassination (from behind)</button>
+</div>
+
+<h2>Player</h2>
+<div class="row">
+  <button data-player="footstep-hard">footstep — metal</button>
+  <button data-player="footstep-soft">footstep — grass</button>
+  <button data-player="landed-soft">landed — soft</button>
+  <button data-player="landed-hard">landed — hard fall</button>
+  <button data-player="jump">jump exertion</button>
+</div>
+
+<h2>Hit / kill confirmation</h2>
+<div class="row">
+  <button data-confirm="hit-body">hit — body</button>
+  <button data-confirm="hit-shield">hit — shield absorbed</button>
+  <button data-confirm="hit-head">hit — headshot</button>
+  <button data-confirm="kill">kill confirmation (two-note)</button>
+</div>
+
+<h2>AI vocalizations (ai.vocalize)</h2>
+<div class="row">
+  <button data-vocalize="SKIRN">SKIRN (panicky)</button>
+  <button data-vocalize="CULL">CULL (clipped)</button>
+  <button data-vocalize="VANE">VANE (authoritative)</button>
+  <button data-vocalize="WARDEN">WARDEN (subsonic)</button>
+</div>
+
+<h2>Vehicle</h2>
+<div class="row">
+  <button id="engineToggle">toggle engine loop</button>
+  <button data-vehicle="impact-soft">impact — soft</button>
+  <button data-vehicle="impact-hard">impact — hard</button>
+  <button data-vehicle="rollover">rollover</button>
+  <button data-vehicle="destroyed">destroyed</button>
+</div>
+<div class="sliders">
+  <label>rpm <input type="range" id="engineRpm" min="0" max="1" step="0.01" value="0.3" /></label>
+  <label>load <input type="range" id="engineLoad" min="0" max="1" step="0.01" value="0.2" /></label>
+</div>
+
+<h2>UI cues (direct trigger, playUi)</h2>
+<div class="row">
+  <button data-ui="select">select</button>
+  <button data-ui="confirm">confirm</button>
+  <button data-ui="back">back</button>
+  <button data-ui="pickup">pickup</button>
+  <button data-ui="lowAmmo">lowAmmo</button>
+</div>
+
+<div id="log"></div>
+
+<script type="module">
+  import { audio, wireAudioEvents } from './index.js';
+  import { events } from '../core/events.js';
+  import { Ev } from '../shared/events.js';
+  import { SurfaceId, SurfaceName } from '../shared/enums.js';
+
+  const PLAYER_ID = 1;
+  const ENEMY_ID = 2;
+  const VEHICLE_ID = 9;
+
+  const logEl = document.getElementById('log');
+  function log(msg) {
+    const line = document.createElement('div');
+    line.textContent = `[${new Date().toISOString().slice(11, 19)}] ${msg}`;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  let seedCounter = 1; // avoids Math.random() — ARCHITECTURE.md §7.2 bans it under src/
+
+  // --- init -------------------------------------------------------------
+  const statusEl = document.getElementById('status');
+  let unwire = null;
+
+  document.getElementById('initBtn').addEventListener('click', async () => {
+    await audio.init();
+    if (audio.ready) {
+      statusEl.textContent = 'ready';
+      statusEl.classList.add('ready');
+      unwire = wireAudioEvents(audio);
+      // Register the local player so shield/hit/kill-confirm cues can tell
+      // "you" from "them", and so hit/kill confirmation logic has an owner.
+      events.emit(Ev.ENTITY_SPAWNED, { entityId: PLAYER_ID, archetype: 'PLAYER', faction: 0, position: [0, 0, 0] });
+      events.emit(Ev.ENTITY_SPAWNED, { entityId: ENEMY_ID, archetype: 'VANE', faction: 2, position: [4, 0, 0] });
+      log('AudioEngine ready. Listener + player registered.');
+    } else {
+      statusEl.textContent = 'unavailable (no AudioContext)';
+      log('AudioEngine.init() resolved but ready=false — no AudioContext in this environment.');
+    }
+  });
+
+  document.getElementById('panicBtn').addEventListener('click', () => { audio.panic(); log('panic()'); });
+  document.getElementById('suspendBtn').addEventListener('click', () => { audio.suspend(); log('suspend()'); });
+  document.getElementById('resumeBtn').addEventListener('click', () => { audio.resume(); log('resume()'); });
+
+  document.getElementById('masterVol').addEventListener('input', (e) => audio.setMasterVolume(Number(e.target.value)));
+  for (const el of document.querySelectorAll('.busVol')) {
+    el.addEventListener('input', (e) => audio.setBusVolume(e.target.dataset.bus, Number(e.target.value)));
+  }
+
+  // A stationary listener a couple of metres back from the origin, facing -Z.
+  audio.setListener({ x: 0, y: 1.6, z: 2 }, { x: 0, y: 0, z: -1 }, { x: 0, y: 1, z: 0 });
+
+  // Simple per-frame housekeeping loop so vehicle engine + grenade ticks work.
+  let lastT = performance.now();
+  function frame(t) {
+    const dt = Math.min(0.1, (t - lastT) / 1000);
+    lastT = t;
+    audio.update(dt);
+    const vc = document.getElementById('voiceCount');
+    if (audio.ready && audio._pool) vc.textContent = `active voices: ${audio._pool.count} / 48`;
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // --- weapon fire --------------------------------------------------------
+  const WEAPON_IDS = ['cadence_ar', 'vector_br', 'longbow', 'breaker', 'ember_repeater', 'vess_sidearm', 'ridgeback_turret'];
+  const weaponsRow = document.getElementById('weapons');
+  for (const weaponId of WEAPON_IDS) {
+    const b = document.createElement('button');
+    b.textContent = weaponId;
+    b.addEventListener('click', () => {
+      events.emit(Ev.WEAPON_FIRED, {
+        ownerId: PLAYER_ID, weaponId, muzzle: [0, 1.6, 1], direction: [0, 0, -1],
+        seed: seedCounter++, ammoRemaining: 10, isFirstOfBurst: true,
+      });
+      log(`weapon.fired ${weaponId}`);
+    });
+    weaponsRow.appendChild(b);
+  }
+
+  document.querySelectorAll('[data-charge]').forEach((b) => b.addEventListener('click', () => {
+    const which = b.dataset.charge;
+    if (which === 'start') events.emit(Ev.WEAPON_CHARGE_START, { ownerId: PLAYER_ID, weaponId: 'vess_sidearm', chargeLevel: 0 });
+    if (which === 'full') events.emit(Ev.WEAPON_CHARGE_FULL, { ownerId: PLAYER_ID, weaponId: 'vess_sidearm', chargeLevel: 1 });
+    if (which === 'released') events.emit(Ev.WEAPON_CHARGE_RELEASED, { ownerId: PLAYER_ID, weaponId: 'vess_sidearm', chargeLevel: 1 });
+    log(`weapon.charge.${which}`);
+  }));
+
+  // --- weapon handling ------------------------------------------------
+  const handlingRow = document.getElementById('handling');
+  const handlingButtons = [
+    ['reload start (from empty)', () => events.emit(Ev.WEAPON_RELOAD_START, { ownerId: PLAYER_ID, weaponId: 'cadence_ar', durationMs: 1800, fromEmpty: true })],
+    ['reload end', () => events.emit(Ev.WEAPON_RELOAD_END, { ownerId: PLAYER_ID, weaponId: 'cadence_ar' })],
+    ['swap start', () => events.emit(Ev.WEAPON_SWAP_START, { ownerId: PLAYER_ID, fromWeaponId: 'cadence_ar', toWeaponId: 'vector_br', durationMs: 700 })],
+    ['swap end', () => events.emit(Ev.WEAPON_SWAP_END, { ownerId: PLAYER_ID, weaponId: 'vector_br' })],
+    ['dryfire click', () => events.emit(Ev.WEAPON_DRYFIRE, { ownerId: PLAYER_ID, weaponId: 'cadence_ar' })],
+    ['overheat vent', () => events.emit(Ev.WEAPON_OVERHEAT, { ownerId: PLAYER_ID, weaponId: 'ember_repeater' })],
+    ['weapon.cooled', () => events.emit(Ev.WEAPON_COOLED, { ownerId: PLAYER_ID, weaponId: 'ember_repeater' })],
+  ];
+  for (const [label, fn] of handlingButtons) {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.addEventListener('click', () => { fn(); log(label); });
+    handlingRow.appendChild(b);
+  }
+
+  document.querySelectorAll('[data-scope]').forEach((b) => b.addEventListener('click', () => {
+    const which = b.dataset.scope;
+    if (which === 'enter2') events.emit(Ev.SCOPE_ENTER, { ownerId: PLAYER_ID, weaponId: 'longbow', magnification: 2 });
+    if (which === 'enter8') events.emit(Ev.SCOPE_ENTER, { ownerId: PLAYER_ID, weaponId: 'longbow', magnification: 8 });
+    if (which === 'exit2') events.emit(Ev.SCOPE_EXIT, { ownerId: PLAYER_ID, weaponId: 'longbow', magnification: 2 });
+    if (which === 'exit8') events.emit(Ev.SCOPE_EXIT, { ownerId: PLAYER_ID, weaponId: 'longbow', magnification: 8 });
+    if (which === 'descope') events.emit(Ev.SCOPE_DESCOPED, { ownerId: PLAYER_ID, weaponId: 'longbow' });
+    log(`scope.${which}`);
+  }));
+
+  // --- surface impacts --------------------------------------------------
+  const impactsRow = document.getElementById('impacts');
+  for (const [name, id] of Object.entries(SurfaceId)) {
+    const b = document.createElement('button');
+    b.textContent = name.toLowerCase();
+    b.addEventListener('click', () => {
+      events.emit(Ev.SURFACE_IMPACT, { point: [0, 1, 0], normal: [0, 1, 0], surfaceId: id, energy: 22, damageType: 0, sourceId: PLAYER_ID });
+      log(`surface.impact ${SurfaceName[id]}`);
+    });
+    impactsRow.appendChild(b);
+  }
+
+  // --- shields ------------------------------------------------------------
+  document.querySelectorAll('[data-shield]').forEach((b) => b.addEventListener('click', () => {
+    const which = b.dataset.shield;
+    const isPlayer = which.endsWith('player');
+    const entityId = isPlayer ? PLAYER_ID : ENEMY_ID;
+    if (which.startsWith('broken')) events.emit(Ev.SHIELD_BROKEN, { entityId, overkill: 2, point: [isPlayer ? 0 : 4, 1, 0], normal: [0, 1, 0] });
+    if (which.startsWith('recharge-start')) events.emit(Ev.SHIELD_RECHARGE_START, { entityId });
+    if (which.startsWith('recharge-full')) events.emit(Ev.SHIELD_RECHARGE_FULL, { entityId });
+    log(`shield event: ${which}`);
+  }));
+
+  // --- grenades -------------------------------------------------------
+  document.querySelectorAll('[data-grenade]').forEach((b) => b.addEventListener('click', () => {
+    const which = b.dataset.grenade;
+    if (which === 'bounce-soft') events.emit(Ev.GRENADE_BOUNCED, { grenadeId: 1, point: [1, 0, 1], normal: [0, 1, 0], impactSpeed: 3, surfaceId: SurfaceId.DIRT });
+    if (which === 'bounce-hard') events.emit(Ev.GRENADE_BOUNCED, { grenadeId: 1, point: [1, 0, 1], normal: [0, 1, 0], impactSpeed: 14, surfaceId: SurfaceId.METAL_BARE });
+    if (which === 'stuck') events.emit(Ev.GRENADE_STUCK, { grenadeId: 2, targetId: PLAYER_ID, localPoint: [0, 0.2, 0] });
+    if (which === 'detonate-frag') events.emit(Ev.GRENADE_DETONATED, { grenadeId: 1, grenadeType: 'frag', point: [2, 0, 0], radius: 5.5, ownerId: ENEMY_ID });
+    if (which === 'detonate-plasma') events.emit(Ev.GRENADE_DETONATED, { grenadeId: 1, grenadeType: 'plasma', point: [2, 0, 0], radius: 4, ownerId: ENEMY_ID });
+    if (which === 'tick-far') events.emit(Ev.GRENADE_THROWN, { ownerId: ENEMY_ID, grenadeType: 'frag', origin: [10, 1, 0], velocity: [0.1, 3, 0], fuseMs: 6000 });
+    if (which === 'tick-near') events.emit(Ev.GRENADE_THROWN, { ownerId: ENEMY_ID, grenadeType: 'frag', origin: [1, 1, 2], velocity: [0.1, 1, -0.1], fuseMs: 6000 });
+    log(`grenade event: ${which}`);
+  }));
+
+  // --- melee ----------------------------------------------------------
+  document.querySelectorAll('[data-melee]').forEach((b) => b.addEventListener('click', () => {
+    const which = b.dataset.melee;
+    if (which === 'swing') events.emit(Ev.MELEE_SWING, { ownerId: PLAYER_ID, durationMs: 120 });
+    if (which === 'landed') events.emit(Ev.MELEE_LANDED, { ownerId: PLAYER_ID, targetId: ENEMY_ID, fromBehind: false, point: [3, 1, 0] });
+    if (which === 'assassination') events.emit(Ev.MELEE_LANDED, { ownerId: PLAYER_ID, targetId: ENEMY_ID, fromBehind: true, point: [3, 1, 0] });
+    log(`melee event: ${which}`);
+  }));
+
+  // --- player -----------------------------------------------------------
+  document.querySelectorAll('[data-player]').forEach((b) => b.addEventListener('click', () => {
+    const which = b.dataset.player;
+    if (which === 'footstep-hard') events.emit(Ev.PLAYER_FOOTSTEP, { entityId: PLAYER_ID, foot: 'left', surfaceId: SurfaceId.METAL_BARE, speed: 4 });
+    if (which === 'footstep-soft') events.emit(Ev.PLAYER_FOOTSTEP, { entityId: PLAYER_ID, foot: 'left', surfaceId: SurfaceId.GRASS, speed: 4 });
+    if (which === 'landed-soft') events.emit(Ev.PLAYER_LANDED, { entityId: PLAYER_ID, impactSpeed: 3, surfaceId: SurfaceId.DIRT });
+    if (which === 'landed-hard') events.emit(Ev.PLAYER_LANDED, { entityId: PLAYER_ID, impactSpeed: 11, surfaceId: SurfaceId.CONCRETE });
+    if (which === 'jump') events.emit(Ev.PLAYER_JUMPED, { entityId: PLAYER_ID });
+    log(`player event: ${which}`);
+  }));
+
+  // --- hit / kill confirmation -----------------------------------------
+  document.querySelectorAll('[data-confirm]').forEach((b) => b.addEventListener('click', () => {
+    const which = b.dataset.confirm;
+    if (which === 'hit-body') events.emit(Ev.DAMAGE_APPLIED, { targetId: ENEMY_ID, sourceId: PLAYER_ID, amount: 8, rawAmount: 8, damageType: 0, hitRegion: 1, point: [4, 1, 0], normal: [0, 1, 0], weaponId: 'vector_br', absorbedByShield: false });
+    if (which === 'hit-shield') events.emit(Ev.DAMAGE_APPLIED, { targetId: ENEMY_ID, sourceId: PLAYER_ID, amount: 8, rawAmount: 8, damageType: 0, hitRegion: 1, point: [4, 1, 0], normal: [0, 1, 0], weaponId: 'vector_br', absorbedByShield: true });
+    if (which === 'hit-head') events.emit(Ev.DAMAGE_APPLIED, { targetId: ENEMY_ID, sourceId: PLAYER_ID, amount: 20, rawAmount: 20, damageType: 0, hitRegion: 0, point: [4, 1.7, 0], normal: [0, 1, 0], weaponId: 'vector_br', absorbedByShield: false });
+    if (which === 'kill') events.emit(Ev.ENTITY_KILLED, { entityId: ENEMY_ID, killerId: PLAYER_ID, weaponId: 'vector_br', hitRegion: 0, damageType: 0, position: [4, 1, 0] });
+    log(`confirm event: ${which}`);
+  }));
+
+  // --- AI vocalizations -------------------------------------------------
+  document.querySelectorAll('[data-vocalize]').forEach((b) => b.addEventListener('click', () => {
+    const archetype = b.dataset.vocalize;
+    events.emit(Ev.AI_VOCALIZE, { entityId: ENEMY_ID, archetype, cue: 'idle' });
+    log(`ai.vocalize ${archetype}`);
+  }));
+
+  // --- vehicle ------------------------------------------------------------
+  let engineActive = false;
+  const rpmSlider = document.getElementById('engineRpm');
+  const loadSlider = document.getElementById('engineLoad');
+  document.getElementById('engineToggle').addEventListener('click', () => {
+    engineActive = !engineActive;
+    log(`vehicle engine ${engineActive ? 'ON' : 'OFF'}`);
+  });
+  setInterval(() => {
+    audio.setVehicleEngine(VEHICLE_ID, {
+      rpm01: Number(rpmSlider.value),
+      load01: Number(loadSlider.value),
+      position: { x: 3, y: 0, z: 0 },
+      active: engineActive,
+    });
+  }, 50);
+
+  document.querySelectorAll('[data-vehicle]').forEach((b) => b.addEventListener('click', () => {
+    const which = b.dataset.vehicle;
+    if (which === 'impact-soft') events.emit(Ev.VEHICLE_IMPACT, { vehicleId: VEHICLE_ID, otherId: ENEMY_ID, relativeSpeed: 4, normal: [0, 1, 0] });
+    if (which === 'impact-hard') events.emit(Ev.VEHICLE_IMPACT, { vehicleId: VEHICLE_ID, otherId: ENEMY_ID, relativeSpeed: 16, normal: [0, 1, 0] });
+    if (which === 'rollover') events.emit(Ev.VEHICLE_ROLLED, { vehicleId: VEHICLE_ID, uprightDot: 0.05 });
+    if (which === 'destroyed') events.emit(Ev.VEHICLE_DESTROYED, { vehicleId: VEHICLE_ID, position: [3, 0, 0] });
+    log(`vehicle event: ${which}`);
+  }));
+
+  // --- UI cues (direct trigger) -------------------------------------
+  document.querySelectorAll('[data-ui]').forEach((b) => b.addEventListener('click', () => {
+    const cue = b.dataset.ui;
+    audio.playUi(cue);
+    log(`playUi('${cue}')`);
+  }));
+
+  log('Page loaded. Click "Init Audio" to begin (WebAudio requires a user gesture).');
+</script>
+
+</body>
+</html>

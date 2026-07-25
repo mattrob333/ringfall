@@ -5,3 +5,5 @@ artifacts/
 *.log
 .DS_Store
 Thumbs.db
+
+baseline/
