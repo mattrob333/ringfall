@@ -1,0 +1,32 @@
+{
+  "name": "ringfall",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ringfall — a browser FPS in Three.js + WebGL2. Everything procedural, zero binary assets.",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "baseline": "node tools/baseline.mjs",
+    "imagediff": "node tools/imagediff.mjs",
+    "profile": "node tools/profile.mjs",
+    "playtest": "node tools/playtest.mjs",
+    "feeltest": "node tools/feeltest.mjs",
+    "silhouette": "node tools/silhouette.mjs",
+    "palette": "node tools/palette.mjs",
+    "assetguard": "node tools/assetguard.mjs",
+    "layercheck": "node tools/layercheck.mjs",
+    "gate": "npm run assetguard && npm run layercheck && npm run feeltest && npm run playtest"
+  },
+  "dependencies": {
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "playwright": "1.62.0",
+    "vite": "8.1.5"
+  }
+}
