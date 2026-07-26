@@ -12,6 +12,7 @@ import {
 } from '@/components/chrome';
 import { Timeline } from '@/components/timeline';
 import { EventRail, EventDossier, HoverReadout } from '@/components/panels';
+import { SocialLive } from '@/components/social';
 import { useBeacons } from '@/lib/selectors';
 import { useGlobeStore } from '@/lib/stores/useGlobeStore';
 import { useTimelineStore } from '@/lib/stores/useTimelineStore';
@@ -108,6 +109,10 @@ export default function MeridianPage() {
 
       {/* ── Cursor-follow readout ──────────────────────────────────── */}
       <HoverReadout />
+
+      {/* Peer interest drips in slowly while the app is open, so the club
+          reads as inhabited rather than as a static seed. Renders nothing. */}
+      <SocialLive />
     </main>
   );
 }
