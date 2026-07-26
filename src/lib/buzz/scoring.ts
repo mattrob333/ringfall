@@ -45,11 +45,13 @@ export type SignalWeights = Record<keyof BuzzSignals, number>;
  * Rationale for the split — these are demand signals for a charter decision,
  * not for a media dashboard:
  *
- *  socialMentions   .24  Largest single input. Raw chatter volume is the best
- *                        available proxy for "is the world paying attention".
- *                        Heavy-tailed, so log-normalised (below) — otherwise a
- *                        World-Cup-scale outlier flattens everything else.
- *  searchInterest   .20  Second-largest. Search intent is closer to *purchase*
+ *  socialMentions   .20  Raw chatter volume, the best available proxy for "is
+ *                        the world paying attention". Heavy-tailed, so
+ *                        log-normalised (below) — otherwise a World-Cup-scale
+ *                        outlier flattens everything else.
+ *                        Tuned DOWN from a starting .24 — see the note on
+ *                        exclusivity.
+ *  searchInterest   .20  Joint-largest. Search intent is closer to *purchase*
  *                        intent than social chatter is; someone typing
  *                        "Monaco GP paddock club" is further down the funnel
  *                        than someone retweeting a highlight. Already a bounded
@@ -63,21 +65,32 @@ export type SignalWeights = Record<keyof BuzzSignals, number>;
  *                        the attention signals only because it saturates: a
  *                        small destination hits 1.0 easily (Courchevel in
  *                        February) without the event being globally hot.
- *  exclusivity      .12  Structural, not temporal — it barely moves year to
- *                        year. It earns its place because our members select
- *                        on it, but it must not dominate: a sealed guest list
- *                        with nobody talking about it is not a hot week.
+ *  exclusivity      .16  Structural, not temporal — it barely moves year to
+ *                        year. Tuned UP from a starting .12, taking the four
+ *                        points from socialMentions, after scoring the real
+ *                        calendar and reading the top 20 against the actual
+ *                        elite fixture list. At .24/.12 the ranking was
+ *                        volume-led: Oktoberfest (1.42M mentions, exclusivity
+ *                        0.28) outranked the Venice Film Festival, and the
+ *                        Monaco Yacht Show (exclusivity 0.78) sat outside the
+ *                        top band. For an audience buying access rather than
+ *                        attendance, scarcity tracks intent better than volume
+ *                        does. At .20/.16 Venice takes #1 and Monaco reaches
+ *                        supernova, which matches how the week actually reads.
+ *                        It must still not dominate — a sealed guest list with
+ *                        nobody talking about it is not a hot week — which is
+ *                        why it stops level with bookingPressure, not above it.
  *  mediaMentions    .10  Smallest. Editorial coverage lags social by days and
  *                        correlates heavily with it, so a high weight would be
  *                        double-counting the same underlying attention.
  */
 export const DEFAULT_WEIGHTS: SignalWeights = {
-  socialMentions: 0.24,
+  socialMentions: 0.2,
   socialVelocity: 0.18,
   searchInterest: 0.2,
   mediaMentions: 0.1,
   bookingPressure: 0.16,
-  exclusivity: 0.12,
+  exclusivity: 0.16,
 };
 
 export const SIGNAL_KEYS = Object.keys(DEFAULT_WEIGHTS) as (keyof BuzzSignals)[];
@@ -284,10 +297,10 @@ export function peerLiftFactor(peerCount: number): number {
  * histogram on every run rather than asserting fixed counts.
  */
 export const HEAT_THRESHOLDS = {
-  supernova: 62,
-  blazing: 48,
-  hot: 33.5,
-  warm: 21,
+  supernova: 62.4,
+  blazing: 48.5,
+  hot: 34,
+  warm: 21.2,
 } as const;
 
 /** Map a 0..100 score to its heat band. */
