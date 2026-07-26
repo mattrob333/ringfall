@@ -124,8 +124,17 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
       // its own layers, and the VANE's translucent shield shell belongs to
       // LAYER_TRANSPARENT. Overriding it rendered the shell as an opaque cyan
       // billboard in the opaque pass.
-      renderer.scene.add(handle.root);
-      bodies.push({ agent, handle });
+      //
+      // The character goes under a HOLDER group that this layer owns. Placement
+      // is written to the holder, never to handle.root, because
+      // animateCharacter() drives root.position.y itself (its root origin is at
+      // the feet). Writing placement to root meant the animation overwrote it
+      // every frame and every enemy rendered at world y = 0 — floating 2-3 m
+      // above terrain that sits at y = -2 to -3.
+      const holder = new THREE.Group();
+      holder.add(handle.root);
+      renderer.scene.add(holder);
+      bodies.push({ agent, handle, holder });
     }
   }
 
@@ -236,10 +245,10 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
   function present(dt) {
     syncCamera();
 
-    for (const { agent, handle } of bodies) {
-      handle.root.position.set(agent.position.x, agent.position.y, agent.position.z);
-      handle.root.rotation.y = agent.yaw ?? 0;
-      handle.root.visible = agent.alive || agent.animState === 'dead';
+    for (const { agent, handle, holder } of bodies) {
+      holder.position.set(agent.position.x, agent.position.y, agent.position.z);
+      holder.rotation.y = agent.yaw ?? 0;
+      holder.visible = agent.alive || agent.animState === 'dead';
       animateCharacter(handle, {
         state: agent.animState,
         dt,

@@ -163,7 +163,22 @@ export class InputCapture {
   }
 
   requestLock() {
-    this.el.requestPointerLock?.();
+    // Chrome returns a Promise here and rejects it when the document is not a
+    // valid pointer-lock root — which is the normal case inside a sandboxed
+    // iframe such as an embedded preview pane. It is routine and non-fatal, so
+    // it must not reach the global error handler; unhandled, it papered the
+    // screen with SecurityError text on every click.
+    try {
+      const r = this.el.requestPointerLock?.();
+      if (r && typeof r.catch === 'function') r.catch(() => {});
+    } catch {
+      /* pointer lock unavailable — mouse look is simply disabled */
+    }
+  }
+
+  /** True when mouse look is actually possible in this document. */
+  get canLock() {
+    return typeof this.el.requestPointerLock === 'function';
   }
 
   /** Fold held keys into the analogue axes. Call once per render frame. */
