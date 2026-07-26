@@ -1265,6 +1265,13 @@ export const NTAA: Airport = {
   fboQuality: 'adequate',
 };
 
+export const NFTF: Airport = {
+  code: 'NFTF',
+  name: 'Fua’amotu, Tongatapu',
+  coords: { lat: -21.2412, lon: -175.1496 },
+  fboQuality: 'adequate',
+};
+
 export const NFFN: Airport = {
   code: 'NFFN',
   name: 'Nadi, Fiji',
@@ -1359,6 +1366,6 @@ export const AIRPORTS: Airport[] = [
   SBJR, SBSP, SADP, SCEL, SPJC, SPZO, SEGS, SAWH, SCCI, SCGC,
   HKNW, HKJK, HTKJ, HTZA, HRYR, HUEN, FALA, FACT, FBMN, FYWE, FVFA, GMMX,
   HELX, FSIA, FIMP,
-  YSSY, YMEN, YMHB, YBCS, YPPH, NZQN, NTAA, NFFN,
+  YSSY, YMEN, YMHB, YBCS, YPPH, NZQN, NTAA, NFFN, NFTF,
   MMTO, MRLB, SBCY, SAME, FLMF, FALE, HAGN, OERK, ZMCK,
 ];

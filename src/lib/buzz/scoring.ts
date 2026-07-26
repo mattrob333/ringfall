@@ -172,14 +172,16 @@ export const PROXIMITY_FAR_TAU = 130;
  * booking window* — the period in which a member can still act on what they
  * see:
  *
- *   d < 0 and already ended → 0.00   nothing to sell
- *   event currently running → 1.00   maximum urgency
- *   0 ≤ d < 10             → 0.80 → 1.00, smoothstepped
+ *   already ended          → 0.00   nothing to sell
+ *   running, or 0 ≤ d < 10 → 0.80 → 1.00, smoothstepped
  *                                    Tapers *down* toward the event: at four
  *                                    days out the villa is gone, the tail
  *                                    number is spoken for, and surfacing it
  *                                    hard is a worse experience than surfacing
  *                                    something the member can actually book.
+ *                                    A running event is pinned to the d=0 value
+ *                                    rather than to 1.0 — see the continuity
+ *                                    note below.
  *   10 ≤ d ≤ 45            → 1.00   the plateau. This is the window where a
  *                                    charter, crew and accommodation can all
  *                                    still be assembled without heroics.
@@ -191,12 +193,27 @@ export const PROXIMITY_FAR_TAU = 130;
  * The 300-vs-7 ratio is therefore ≈ 0.27 : 0.96 — a 3.5× handicap, enough that
  * next week wins at comparable signal levels but not so much that a genuine
  * supernova a year out (Olympics, a Ryder Cup) vanishes from the globe.
+ *
+ * ── Continuity at d = 0 ──────────────────────────────────────────────────────
+ *
+ * A running event is pinned to the d=0 taper value (0.80), *not* to 1.0. An
+ * earlier revision returned 1.0 for "running", which made the curve jump: as
+ * the scrubber crossed into an event's first day the score snapped from 0.84 up
+ * to 1.00, so a beacon visibly dimmed on the approach and then flashed back
+ * bright — indistinguishable from a rendering bug. The whole function is now
+ * continuous over d ∈ (−∞, 45], which it must be, because the scrubber samples
+ * it densely and the renderer maps the result straight onto emissive intensity.
+ *
+ * The "this is happening right now" emphasis is carried by `relevance`, which is
+ * 1.0 across the event's whole run and is the value the renderer uses for pillar
+ * height. Proximity answers a different question — *can you still book it* — and
+ * the honest answer on the morning of the race is "no".
  */
 export function proximityMultiplier(daysToStart: number, daysToEnd: number): number {
   if (daysToEnd < 0) return 0; // finished
-  if (daysToStart <= 0) return 1; // running right now
-  if (daysToStart < PROXIMITY_PEAK_START) {
-    const t = daysToStart / PROXIMITY_PEAK_START;
+  const d = Math.max(0, daysToStart); // running events pin to the d=0 value
+  if (d < PROXIMITY_PEAK_START) {
+    const t = d / PROXIMITY_PEAK_START;
     return PROXIMITY_IMMINENT + (1 - PROXIMITY_IMMINENT) * smoothstep(t);
   }
   if (daysToStart <= PROXIMITY_PEAK_END) return 1;
@@ -250,9 +267,9 @@ export function peerLiftFactor(peerCount: number): number {
  * model over the shipped dataset, and `scripts/validate-data.ts` prints that
  * histogram on every run so drift is caught immediately.
  *
- * Measured result over the 237-event shipped calendar (reference date
- * 2026-07-26): supernova 4.6%, blazing 10.1%, hot 19.8%, warm 30.0%,
- * smoldering 35.4%. The bands are *not* evenly spaced — they narrow toward the
+ * Measured result over the 241-event shipped calendar (reference date
+ * 2026-07-26): supernova 4.6%, blazing 10.0%, hot 19.9%, warm 29.9%,
+ * smoldering 35.7%. The bands are *not* evenly spaced — they narrow toward the
  * top, because the score distribution is right-skewed (median ≈ 25, p95 ≈ 62)
  * and equal-width bands would put four fifths of the calendar in smoldering.
  *
@@ -268,8 +285,8 @@ export function peerLiftFactor(peerCount: number): number {
  */
 export const HEAT_THRESHOLDS = {
   supernova: 62,
-  blazing: 50.5,
-  hot: 34.5,
+  blazing: 48,
+  hot: 33.5,
   warm: 21,
 } as const;
 

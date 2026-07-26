@@ -16,7 +16,7 @@ import {
   FBMN,
   FYWE,
   MMSD,
-  NFFN,
+  NFTF,
   RJOO,
   SAWH,
   SCCI,
@@ -465,7 +465,7 @@ export const NATURE_EVENTS: WorldEvent[] = [
     accessNote:
       'Tonga caps licensed whale-swim operators and permits four swimmers plus a guide in the water at once; the good boats are chartered whole by returning groups for the August and September weeks, and reaching Vava’u means a Fiji or Tongatapu connection',
     venues: ['Vava’u archipelago', 'Port of Refuge', 'Hunga', 'Swallows Cave'],
-    nearestJetPort: NFFN,
+    nearestJetPort: NFTF,
     description:
       'Oceania humpbacks migrate from Antarctic feeding grounds to calve in the sheltered Vava’u channels from late June, and Tonga is one of very few countries that licenses regulated in-water encounters. The reliable months are August and September, when mothers rest with new calves in flat water and males sing beneath the boat. Encounters are entirely on the animals’ terms — a "sleeping mother and calf" that stays down for twenty minutes is the good outcome, and some days no whale settles at all.',
     whyGo: [
