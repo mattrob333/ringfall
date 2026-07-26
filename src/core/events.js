@@ -14,6 +14,17 @@ class EventBus {
     this._depth = 0;
     this._emitCounts = new Map();
     this._trace = null;
+    this._errorKeys = new Set();
+    this._errorCount = 0;
+  }
+
+  /** Handler failures are contained, not thrown. Tools read this to gate on them. */
+  get handlerErrors() {
+    return this._errorCount;
+  }
+
+  handlerErrorKeys() {
+    return [...this._errorKeys];
   }
 
   /** @returns {() => void} unsubscribe */
@@ -62,8 +73,21 @@ class EventBus {
       try {
         snapshot[i](payload);
       } catch (err) {
-        this._depth--;
-        throw new Error(`[events] handler for "${name}" threw: ${err.message}`, { cause: err });
+        // CONTAIN, do not propagate. Rethrowing meant one bad subscriber broke
+        // the EMITTER: a typo in a game-layer damage handler threw out of
+        // AiAgent._fireRound and silently stopped every enemy in the level from
+        // firing. A subscriber is an observer; it must not be able to abort the
+        // thing it is observing.
+        //
+        // Reported once per (event, message) pair so a per-frame failure cannot
+        // flood the console into uselessness, and counted so the tools can see
+        // it. It is still a defect — it is just no longer a cascading one.
+        const key = `${name}::${err?.message ?? err}`;
+        if (!this._errorKeys.has(key)) {
+          this._errorKeys.add(key);
+          console.error(`[events] handler for "${name}" threw (further copies suppressed):`, err);
+        }
+        this._errorCount++;
       }
     }
     this._depth--;

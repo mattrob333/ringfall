@@ -602,12 +602,16 @@ export function tracer(ctx, mx, my, mz, dx, dy, dz, family) {
   const rand = ctx.rand;
   const vess = family === Family.VESS;
   const c = vess ? FxColor.vessTracer : FxColor.cdfTracer;
-  const speed = vess ? 190 : 265;
+  // ORCHESTRATOR TUNE, from play: at 0.038 m wide and 265 m/s the round was
+  // sub-pixel past a few metres and the shot read as nothing leaving the gun.
+  // Widened ~3x and slowed ~25% so the round is legible in flight without
+  // becoming a laser. It still crosses 60 m in a third of a second.
+  const speed = vess ? 150 : 200;
   ctx.add.spawn(
     mx + dx * 0.3, my + dy * 0.3, mz + dz * 0.3,
     dx * speed, dy * speed, dz * speed,
-    0.30, vess ? 0.055 : 0.038, vess ? 0.030 : 0.014,
-    c[0], c[1], c[2], (vess ? 4.5 : 3.2) * B, 0.15 * B,
+    0.32, vess ? 0.16 : 0.115, vess ? 0.055 : 0.035,
+    c[0], c[1], c[2], (vess ? 6.5 : 5.0) * B, 0.2 * B,
     0, 0, 0, 0, Shape.STREAK, vess ? 0.008 : 0.012, rand.next(), 1, 1.25,
   );
 }

@@ -10,10 +10,12 @@ import { events } from '../core/events.js';
 import { setSessionSeed } from '../core/rng.js';
 import { allocId } from '../core/ids.js';
 import { InputState, InputCapture } from '../core/input.js';
-import { CAMERA, SIM_DT, PLAYER } from '../shared/tuning.js';
-import { Archetype, Faction } from '../shared/enums.js';
+import {
+  CAMERA, SIM_DT, PLAYER, MELEE, ENEMY_WEAPONS, GRENADE, RESPAWN_GRACE,
+} from '../shared/tuning.js';
+import { Archetype, Faction, HitRegion, DamageType } from '../shared/enums.js';
 import { Ev } from '../shared/events.js';
-import { DEG } from '../shared/math.js';
+import { DEG, smoothstep } from '../shared/math.js';
 
 import { PhysicsWorld } from '../physics/index.js';
 import { buildLevel } from '../world/index.js';
@@ -138,6 +140,61 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
     }
   }
 
+  // ---- enemy fire -> player damage ---------------------------------------
+  //
+  // src/ai resolves whether each shot HITS (it stores the angular error and the
+  // target's angular radius on agent.lastShot) but deliberately does not emit
+  // damage.applied, because src/weapons is the damage resolver and the AI has
+  // no WeaponSystem. Nothing bridged the two, so enemies shot at the player for
+  // the entire build and the player was invulnerable. That bridge is this
+  // layer's job — it is the only layer allowed to know about both.
+  const agentById = new Map();
+  for (const b of bodies) agentById.set(b.agent.entityId, b.agent);
+
+  const _hitPoint = new THREE.Vector3();
+  const _hitNormal = new THREE.Vector3();
+
+  let respawnGrace = 0;
+
+  events.on(Ev.WEAPON_FIRED, (p) => {
+    if (p.ownerId === playerId || respawnGrace > 0) return;
+    const a = agentById.get(p.ownerId);
+    const shot = a?.lastShot;
+    if (!a || !a.alive || !shot) return;
+    // Geometric hit test, matching how src/ai's own self-test scores hits:
+    // the shot lands if its angular error is inside the target's angular radius.
+    if (!(shot.errRad <= shot.targetAngRad)) return;
+
+    // Enemy weapon ids (vess_carbine/needler/repeater) are NOT in the player's
+    // WEAPONS table, so looking them up there silently returned undefined and
+    // every enemy round was discarded. Their damage lives in ENEMY_WEAPONS.
+    const def = ENEMY_WEAPONS[p.weaponId] ?? ENEMY_WEAPONS.default;
+    _hitPoint.copy(player.eyePosition);
+    _hitNormal.set(p.muzzle[0] - _hitPoint.x, 0, p.muzzle[2] - _hitPoint.z).normalize();
+    player.applyDamage(
+      def.damage,
+      def.damageType ?? DamageType.KINETIC,
+      HitRegion.TORSO,
+      p.ownerId,
+      p.weaponId,
+      1,
+      _hitPoint,
+      _hitNormal,
+    );
+  });
+
+  events.on(Ev.MELEE_LANDED, (p) => {
+    if (p.ownerId === playerId || p.targetId !== playerId || respawnGrace > 0) return;
+    player.applyDamage(
+      p.fromBehind ? 1e6 : MELEE.damage,
+      DamageType.MELEE,
+      HitRegion.TORSO,
+      p.ownerId,
+      null,
+      1,
+    );
+  });
+
   // ---- vehicle ------------------------------------------------------------
   const ridgeback = vehicles.spawn({ type: 'ridgeback', position: level.spawns.vehicle, yaw: 0.6 });
 
@@ -226,8 +283,39 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
     alive: true,
   };
 
+  // Death was terminal: the HUD said "AWAITING RESPAWN" and nothing ever
+  // respawned, so the first mistake ended the session. Respawn at the spawn
+  // point after a short beat, with a fresh magazine and grenades.
+  const RESPAWN_DELAY = 3.0;
+  let deadTimer = 0;
+
   const _lunge = new THREE.Vector3();
   function step(dt) {
+    if (respawnGrace > 0) respawnGrace -= dt;
+    if (!player.alive) {
+      deadTimer += dt;
+      if (deadTimer >= RESPAWN_DELAY) {
+        deadTimer = 0;
+        player.respawn(level.spawns.player);
+        respawnGrace = RESPAWN_GRACE;
+        for (const s of weapons.slots) {
+          s.ammo = s.def.ammo === 2 ? 0 : s.def.mag;
+          s.reserve = s.def.reserve;
+          s.heat = 0;
+          s.overheated = false;
+          s.bloom = 0;
+        }
+        weapons.grenades.frag = GRENADE.frag.maxCarried;
+        weapons.grenades.plasma = GRENADE.plasma.maxCarried;
+        renderer.taa.reset();
+      }
+      // Still tick the world so enemies keep behaving while you are down.
+      ai.update(dt, _playerState);
+      vehicles.update(dt);
+      physics.step(dt);
+      return;
+    }
+
     // Aim-assist turn friction (FEEL.md §4.8) scales look input before the
     // controller consumes it. Uses last frame's aim state, which is one frame
     // of latency the player cannot perceive at 120 Hz.
@@ -256,10 +344,35 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
   function present(dt) {
     syncCamera();
 
-    for (const { agent, handle, holder } of bodies) {
+    for (const b of bodies) {
+      const { agent, handle, holder } = b;
       holder.position.set(agent.position.x, agent.position.y, agent.position.z);
       holder.rotation.y = agent.yaw ?? 0;
-      holder.visible = agent.alive || agent.animState === 'dead';
+      holder.rotation.x = 0;
+      holder.rotation.z = 0;
+
+      // Death: TOPPLE, then sink, then despawn. A corpse that simply stops
+      // animating is indistinguishable from one that is still fighting, and
+      // the player keeps dumping ammo into it.
+      if (!agent.alive) {
+        b.deadFor = (b.deadFor ?? 0) + dt;
+        const t = b.deadFor;
+        // 0.00-0.75s  fall onto its side, with a slight yaw twist
+        const fall = smoothstep(Math.min(1, t / 0.75));
+        holder.rotation.x = fall * 1.45;
+        holder.rotation.y += fall * (b.fallTwist ?? (b.fallTwist = agent.entityId % 2 ? 0.5 : -0.5));
+        holder.position.y -= fall * 0.12;
+        // 1.90-3.10s  sink into the ground and disappear
+        if (t > 1.9) {
+          const sink = smoothstep(Math.min(1, (t - 1.9) / 1.2));
+          holder.position.y -= sink * 2.4;
+          if (sink >= 1) holder.visible = false;
+        }
+      } else {
+        b.deadFor = 0;
+        holder.visible = true;
+      }
+
       animateCharacter(handle, {
         state: agent.animState,
         dt,

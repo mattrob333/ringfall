@@ -56,6 +56,25 @@ export class AmmoPanel {
       color: ammoColor, align: 'right',
     });
 
+    // "[R] RELOAD" prompt. A player who does not already know the keybind has
+    // no way to discover it, and an empty magazine reads as a broken weapon.
+    // Pulses when the magazine is actually empty, steady when merely low.
+    if (weapon && !weapon.reloading && !weapon.overheated) {
+      const mag = weapon.magSize ?? 0;
+      const ammo = weapon.ammo ?? 0;
+      const reserve = weapon.reserve ?? 0;
+      const empty = ammo <= 0;
+      const low = mag > 0 && ammo / mag <= 0.3;
+      if ((empty || low) && reserve > 0) {
+        this._promptT = (this._promptT ?? 0) + 1;
+        const pulse = empty ? 0.55 + 0.45 * Math.sin(this._promptT * 0.13) : 0.75;
+        drawText(ctx, '[R] RELOAD', rightX, y + 4 * scale, g.labelSize * 1.15, {
+          color: withAlpha(empty ? HUD.danger : HUD.warning, pulse),
+          align: 'right',
+        });
+      }
+    }
+
     // reload progress bar
     if (weapon?.reloading) {
       const barY = y - g.primarySize * 0.15;

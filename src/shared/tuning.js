@@ -266,6 +266,45 @@ export const ENEMY = Object.freeze({
   },
 });
 
+/**
+ * Enemy weapon output.
+ *
+ * SPEC GAP, filled here. FEEL.md §6 specifies enemy health, shields, accuracy
+ * and reaction latency but never says how much damage they deal, and the AI's
+ * weapon profiles in src/ai/constants.js carry cadence but no damage. The
+ * result was that enemies shot at the player forever and the player was
+ * invulnerable.
+ *
+ * Derived against FEEL.md §3 (player 70 shield + 45 health = 115 EHP):
+ *   vess_carbine  5-round burst, 0.1 intra, 0.7 refire  -> ~4.5 rounds/s
+ *   at a realistic ~50% hit rate that is ~2.3 hits/s from one enemy.
+ *   PLASMA is x1.60 vs shields and x0.55 vs health, so at 4 damage:
+ *     shields  70 / (4 x 1.60) = 11 hits ~ 4.8 s
+ *     health   45 / (4 x 0.55) = 21 hits ~ 9.1 s
+ *   ~14 s of uninterrupted fire from a SINGLE enemy to kill, well under 5 s
+ *   from a squad of three. Threatening in the open, survivable behind cover,
+ *   and it leaves the 4.0 s shield-recharge delay meaningful.
+ *
+ * All Vess small arms are PLASMA so the shield/health asymmetry that defines
+ * the sandbox applies to incoming fire too.
+ */
+export const ENEMY_WEAPONS = Object.freeze({
+  vess_carbine: { damage: 2.6, damageType: 1 },
+  vess_needler: { damage: 2.0, damageType: 1 },
+  vess_repeater: { damage: 3.4, damageType: 1 },
+  vess_lance: { damage: 6.0, damageType: 1 },
+  default: { damage: 2.6, damageType: 1 },
+});
+
+/**
+ * Respawn protection. Measured: at the first pass of ENEMY_WEAPONS the player
+ * respawned into six already-engaged enemies with line of sight on the spawn
+ * and lost a full 70 shield in about 1.5 s, repeatedly. That is spawn-camping
+ * by level layout, not difficulty. Damage was reduced ~35% AND this grace added
+ * — the grace alone would only have delayed the problem.
+ */
+export const RESPAWN_GRACE = 2.5;
+
 export const AI = Object.freeze({
   missGraceOnAcquire: 0.5, // guaranteed misses for the first 0.5s of re-acquisition
   sightRange: 90,
