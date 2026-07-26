@@ -20,7 +20,7 @@ import { DEG, smoothstep } from '../shared/math.js';
 import { PhysicsWorld } from '../physics/index.js';
 import { buildLevel } from '../world/index.js';
 import { PlayerController } from '../player/index.js';
-import { WeaponSystem, targets } from '../weapons/index.js';
+import { WeaponSystem, targets, AmmoKind } from '../weapons/index.js';
 import { AiDirector } from '../ai/index.js';
 import { buildCharacter, animateCharacter, setShieldState } from '../characters/index.js';
 import { VehicleSystem } from '../vehicles/index.js';
@@ -299,7 +299,9 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
         player.respawn(level.spawns.player);
         respawnGrace = RESPAWN_GRACE;
         for (const s of weapons.slots) {
-          s.ammo = s.def.ammo === 2 ? 0 : s.def.mag;
+          // AmmoKind values are STRINGS; the previous `=== 2` never matched,
+          // so a heat weapon would respawn with a meaningless full magazine.
+          s.ammo = s.def.ammo === AmmoKind.HEAT ? 0 : s.def.mag;
           s.reserve = s.def.reserve;
           s.heat = 0;
           s.overheated = false;
