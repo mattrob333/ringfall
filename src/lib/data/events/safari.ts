@@ -10,17 +10,18 @@
 
 import type { WorldEvent } from '@/lib/types';
 import {
-  HKNW,
-  HTKJ,
-  HRYR,
-  HUEN,
-  FBMN,
-  FYWE,
   FALA,
+  FBMN,
+  FLMF,
   FVFA,
-  VIJP,
-  SBSP,
+  FYWE,
+  HKNW,
+  HRYR,
+  HTKJ,
+  HUEN,
+  SBCY,
   VCBI,
+  VIJP,
   VQPR,
 } from './airports';
 
@@ -333,7 +334,7 @@ export const SAFARI_EVENTS: WorldEvent[] = [
     accessNote:
       'The bush camps carry four to six chalets and physically do not exist outside the dry months — they are rebuilt each June and struck each November, so the season is the inventory',
     venues: ['South Luangwa National Park', 'Nsefu Sector', 'Luwi River', 'Mwamba bush camp'],
-    nearestJetPort: FALA,
+    nearestJetPort: FLMF,
     description:
       'Norman Carr started guided walking here in the 1950s and Zambia still licenses walking guides harder than anyone else — an armed scout, a guide, and no vehicle. The season is dictated by the Luangwa: the river drops from June, the floodplain firms up, and by August game is concentrated on the remaining lagoons. Camps close and are dismantled when the rains come in November, so there is no late option, and the last weeks of October run above 40°C.',
     whyGo: [
@@ -528,7 +529,7 @@ export const SAFARI_EVENTS: WorldEvent[] = [
     accessNote:
       'Porto Jofre has a handful of lodges and two floating hotels moored on the river; the flotel cabins for August and September are gone by the previous December and the Transpantaneira road is the only land access',
     venues: ['Porto Jofre', 'Rio Cuiabá', 'Três Irmãos river', 'Encontro das Águas State Park'],
-    nearestJetPort: SBSP,
+    nearestJetPort: SBCY,
     description:
       'The Pantanal floods for half the year; when the water drops from July the jaguars come down to the exposed riverbanks to hunt caiman and capybara, and you watch from a small boat at eye level. Sighting rates over three full days on the Cuiabá and Três Irmãos run eighty to ninety percent, which is not true of any other big cat anywhere. Wait until November and the rains return, the banks flood, and the animals disappear back into vegetation you cannot enter.',
     whyGo: [

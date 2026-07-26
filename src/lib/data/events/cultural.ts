@@ -10,23 +10,23 @@
 
 import type { WorldEvent } from '@/lib/types';
 import {
-  LIQS,
-  SBJR,
-  LIPZ,
   EDMO,
-  VIJP,
-  VIDP,
-  MMOX,
+  HAGN,
   LEVC,
   LEZL,
-  RJOO,
-  VQPR,
-  RKSS,
-  VTBD,
-  HKJK,
-  SPZO,
+  LIPZ,
+  LIQS,
+  MMOX,
   OMAD,
+  RJOO,
+  SBJR,
   SCEL,
+  SPZO,
+  VIDP,
+  VIJP,
+  VQPR,
+  VTBD,
+  ZMCK,
 } from './airports';
 
 export const CULTURAL_EVENTS: WorldEvent[] = [
@@ -857,7 +857,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
       'Sükhbaatar Square',
       'Archery ground, Ulaanbaatar',
     ],
-    nearestJetPort: RKSS,
+    nearestJetPort: ZMCK,
     description:
       'Naadam opens on 11 July with a stadium ceremony and runs three days of bökh wrestling, archery and horse racing, the last of these held out on the steppe with children as jockeys over distances up to 25km. The wrestling is the national obsession — no weight classes, single elimination, and the eagle dance between bouts. Provincial naadams in Övörkhangai or Arkhangai the following week are smaller, unstaged and better if you want the version without grandstands. Ulaanbaatar has limited jet handling, so the practical routing is a positioning stop; Seoul is the nearest listed gateway.',
     whyGo: [
@@ -904,7 +904,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
       'Debre Birhan Selassie Church',
       'Gondar city churches',
     ],
-    nearestJetPort: HKJK,
+    nearestJetPort: HAGN,
     description:
       'Timkat is the Ethiopian Orthodox Epiphany, celebrated on 19 January, and Gondar stages the most theatrical version of it because the tabot of each church is carried in procession to Emperor Fasilides’ stone bathing pool, which is filled once a year for the occasion. The eve — Ketera — is the procession under white shamma cloth and chanting priests; the morning is the blessing of the water, after which the crowd goes into the pool. Debre Birhan Selassie’s painted ceiling of angel faces is a short walk away. Ethiopia has no listed executive gateway, so this is flown as a Nairobi or Addis positioning with a short domestic hop.',
     whyGo: [

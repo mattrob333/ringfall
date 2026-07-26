@@ -14,18 +14,18 @@
 
 import type { WorldEvent } from '@/lib/types';
 import {
-  LFLJ,
   KASE,
-  LSZS,
+  KJAC,
+  LFLJ,
+  LOWI,
   LSGK,
   LSGS,
-  RJCC,
-  KJAC,
-  LOWI,
-  SCEL,
+  LSZS,
   NZQN,
+  RJCC,
+  SAME,
+  SCEL,
   YSSY,
-  SADP,
 } from './airports';
 
 export const SKI_EVENTS: WorldEvent[] = [
@@ -705,7 +705,7 @@ export const SKI_EVENTS: WorldEvent[] = [
     accessNote:
       'There is no jet field at the resort — aircraft clear at Buenos Aires or Mendoza and continue by turboprop to Malargüe, then 70km by road; the four base hotels are the only accommodation',
     venues: ['Marte chairlift', 'Hotel Piscis', 'Valle de Las Leñas'],
-    nearestJetPort: SADP,
+    nearestJetPort: SAME,
     description:
       'Las Leñas is a lift-served backcountry resort in southern Mendoza province: when the Marte chair runs it opens roughly 4,000 hectares of steep, unpatrolled Andean terrain that has no real equivalent in the northern Alps. The catch is that Marte is closed as often as it is open — high wind and avalanche control shut it for days at a time. The season runs from late June into early October, and August is the most reliable stretch.',
     whyGo: [

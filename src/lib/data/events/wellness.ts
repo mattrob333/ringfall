@@ -14,14 +14,14 @@
 import type { WorldEvent } from '@/lib/types';
 import {
   EDMO,
-  LSGG,
   LEVC,
-  VTBD,
+  LOWS,
+  LSGG,
+  MRLB,
+  OMDW,
   VIDP,
   VOCI,
-  MMUN,
-  LOWS,
-  OMDW,
+  VTBD,
 } from './airports';
 
 export const WELLNESS_EVENTS: WorldEvent[] = [
@@ -272,7 +272,7 @@ export const WELLNESS_EVENTS: WorldEvent[] = [
     accessNote:
       'Aircraft clear customs at Liberia Guanacaste and continue by road or light twin — Nosara\'s own strip is unpaved and daylight-only; the Harmony Hotel and the Bodhi Tree retreat weeks sell out for the January-to-March dry season by the previous autumn',
     venues: ['Playa Guiones', 'The Harmony Hotel', 'Bodhi Tree Yoga Resort'],
-    nearestJetPort: MMUN,
+    nearestJetPort: MRLB,
     description:
       'The Nicoya Peninsula is one of the five demographically verified Blue Zones, where men reach ninety at roughly four times the North American rate — the working explanations are the calcium-heavy well water, a bean-and-maize diet and sustained low-grade physical work. Nosara is the practical base: Playa Guiones runs seven kilometres, the surf is consistent, and the town has been a yoga centre since the 1990s. January to March is the dry season, when the roads are passable and the humidity drops.',
     whyGo: [

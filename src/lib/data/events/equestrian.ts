@@ -10,17 +10,17 @@
 import type { WorldEvent } from '@/lib/types';
 import {
   EGLF,
+  EHBK,
   EINN,
   KSDF,
-  LFPB,
-  OMDW,
-  YMEN,
-  SADP,
   LEMG,
+  LFPB,
   LSZS,
-  EHBK,
-  OEJN,
+  OERK,
+  OMDW,
   RJTT,
+  SADP,
+  YMEN,
 } from './airports';
 
 export const EQUESTRIAN_EVENTS: WorldEvent[] = [
@@ -311,7 +311,7 @@ export const EQUESTRIAN_EVENTS: WorldEvent[] = [
       'Diriyah',
       'Riyadh season venues',
     ],
-    nearestJetPort: OEJN,
+    nearestJetPort: OERK,
     description:
       'The Saudi Cup carries a $20m purse — the largest of any horse race — and anchors a two-day international meeting in early February with turf and dirt Group races, an Arabian card and the Neom Turf Cup. It is only eight editions old and the international runners are genuine: American dirt horses, Japanese milers and European turf stables all target it. The associated programme in Diriyah and the Riyadh season events run through the same week. This is a two-night trip, not a stay; the racing is the whole reason and the country is still working out the rest.',
     whyGo: [

@@ -9,19 +9,19 @@
 
 import type { WorldEvent } from '@/lib/types';
 import {
-  SAWH,
-  SCCI,
+  BIRK,
   ENTC,
   ESNK,
-  BIRK,
-  SEGS,
-  RJOO,
-  FYWE,
-  VRMM,
-  NFFN,
-  FALA,
-  MMSD,
+  FALE,
   FBMN,
+  FYWE,
+  MMSD,
+  NFFN,
+  RJOO,
+  SAWH,
+  SCCI,
+  SEGS,
+  VRMM,
 } from './airports';
 
 export const NATURE_EVENTS: WorldEvent[] = [
@@ -541,7 +541,7 @@ export const NATURE_EVENTS: WorldEvent[] = [
     accessNote:
       'Operators run out of Port St Johns with spotter aircraft and launch through surf from the beach; the good boats take eight divers and sell the mid-June to mid-July fortnight a year out, and there is no luxury accommodation on the Wild Coast',
     venues: ['Port St Johns', 'Wild Coast', 'Mbotyi', 'Waterfall Bluff'],
-    nearestJetPort: FALA,
+    nearestJetPort: FALE,
     description:
       'A tongue of cold water pushes north up the Eastern Cape coast in the southern winter and carries sardine shoals with it; common dolphins herd the fish into bait balls, Cape gannets dive through from above, and bronze whaler sharks and Bryde’s whales work them from below. Everything depends on water temperature and wind — some years the run barely materialises, and even in a good year you may sit through four blank days for one twenty-minute bait ball. Sea launches are through surf and conditions can cancel days at a time.',
     whyGo: [

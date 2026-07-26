@@ -1008,6 +1008,20 @@ export const MYEF: Airport = {
   fboQuality: 'adequate',
 };
 
+export const MYNN: Airport = {
+  code: 'MYNN',
+  name: 'Lynden Pindling, Nassau',
+  coords: { lat: 25.039, lon: -77.4661 },
+  fboQuality: 'excellent',
+};
+
+export const TTPP: Airport = {
+  code: 'TTPP',
+  name: 'Piarco, Trinidad',
+  coords: { lat: 10.5954, lon: -61.3372 },
+  fboQuality: 'adequate',
+};
+
 export const MDPC: Airport = {
   code: 'MDPC',
   name: 'Punta Cana',
@@ -1341,7 +1355,7 @@ export const AIRPORTS: Airport[] = [
   KTEB, KHPN, KVNY, KBUR, KHND, KOPF, KFXE, KPBI, KASE, KEGE, KJAC, KSUN,
   KBJC, KSLC, KMRY, KTRM, KPSP, KRNO, KAGS, KSDF, KACK, KSAF, KPWK, KCHS,
   KHOU, CYTZ, CYVR, MMSD, MMOX, MMUN,
-  TFFJ, TNCM, TAPA, TBPB, MYEF, MDPC,
+  TFFJ, TNCM, TAPA, TBPB, MYEF, MDPC, MYNN, TTPP,
   SBJR, SBSP, SADP, SCEL, SPJC, SPZO, SEGS, SAWH, SCCI, SCGC,
   HKNW, HKJK, HTKJ, HTZA, HRYR, HUEN, FALA, FACT, FBMN, FYWE, FVFA, GMMX,
   HELX, FSIA, FIMP,

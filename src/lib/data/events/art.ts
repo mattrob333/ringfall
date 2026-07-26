@@ -7,21 +7,21 @@
 
 import type { WorldEvent } from '@/lib/types';
 import {
-  LFSB,
-  LFPB,
-  KOPF,
-  VHHH,
-  OTHH,
   EGLF,
-  KVNY,
-  RKSS,
   EHBK,
-  LIPZ,
-  WSSL,
-  KTEB,
-  OMDW,
-  MMOX,
   KASE,
+  KOPF,
+  KTEB,
+  KVNY,
+  LFPB,
+  LFSB,
+  LIPZ,
+  MMTO,
+  OMDW,
+  OTHH,
+  RKSS,
+  VHHH,
+  WSSL,
 } from './airports';
 
 export const ART_EVENTS: WorldEvent[] = [
@@ -436,7 +436,7 @@ export const ART_EVENTS: WorldEvent[] = [
       'Mexico City’s restaurant calendar is at its strongest that week',
     ],
     tags: ['art fair', 'Latin America', 'contemporary', 'Mexico City Art Week'],
-    nearestJetPort: MMOX,
+    nearestJetPort: MMTO,
     signals: {
       socialMentions: 19000,
       socialVelocity: 0.08,
