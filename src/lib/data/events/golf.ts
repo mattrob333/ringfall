@@ -12,6 +12,7 @@ import {
   EINN,
   KAGS,
   KHOU,
+  KADS,
   KMRY,
   KPWK,
   KTEB,
@@ -277,7 +278,7 @@ export const GOLF_EVENTS: WorldEvent[] = [
     accessNote:
       'Ticket registration opens roughly eighteen months out and daily grounds passes are allocated from that list; the Wanamaker Club and the hospitality suites along 18 sell direct from the PGA of America, and the Omni on site is contracted years ahead',
     venues: ['Fields Ranch East, PGA Frisco'],
-    nearestJetPort: KHOU,
+    nearestJetPort: KADS,
     description:
       'The first PGA Championship in North Texas since 1963, on a Gil Hanse design built specifically to host it — wide fairways, severe green complexes and almost no trees, so wind is the entire defence. The strongest field of any major on paper, since the PGA takes the top 100 in the world plus the club professionals. Late May in Texas is hot enough that afternoon tee times become a genuine disadvantage.',
     whyGo: [

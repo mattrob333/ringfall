@@ -934,6 +934,14 @@ export const KHOU: Airport = {
   fboQuality: 'excellent',
 };
 
+/** The north-Dallas business-aviation field — 30km from PGA Frisco. */
+export const KADS: Airport = {
+  code: 'KADS',
+  name: 'Dallas Addison',
+  coords: { lat: 32.9686, lon: -96.8364 },
+  fboQuality: 'exceptional',
+};
+
 export const CYTZ: Airport = {
   code: 'CYTZ',
   name: 'Billy Bishop Toronto City',
@@ -1361,7 +1369,7 @@ export const AIRPORTS: Airport[] = [
   VIDP, VIJP, VOCI, VABB, VQPR, VRMM, VCBI, WADD, ZSPD, VDSR, VLLB, ZUJZ,
   KTEB, KHPN, KVNY, KBUR, KHND, KOPF, KFXE, KPBI, KASE, KEGE, KJAC, KSUN,
   KBJC, KSLC, KMRY, KTRM, KPSP, KRNO, KAGS, KSDF, KACK, KSAF, KPWK, KCHS,
-  KHOU, CYTZ, CYVR, MMSD, MMOX, MMUN,
+  KHOU, KADS, CYTZ, CYVR, MMSD, MMOX, MMUN,
   TFFJ, TNCM, TAPA, TBPB, MYEF, MDPC, MYNN, TTPP,
   SBJR, SBSP, SADP, SCEL, SPJC, SPZO, SEGS, SAWH, SCCI, SCGC,
   HKNW, HKJK, HTKJ, HTZA, HRYR, HUEN, FALA, FACT, FBMN, FYWE, FVFA, GMMX,
