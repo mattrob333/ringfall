@@ -65,6 +65,12 @@ const KEYMAP = {
   KeyG: 'grenade',
   KeyE: 'interact',
   KeyX: 'switchGrenade',
+  // Arrow keys look. Not in the reference control scheme, but they make the
+  // game aimable in any environment, including ones that refuse pointer lock.
+  ArrowLeft: 'lookLeft',
+  ArrowRight: 'lookRight',
+  ArrowUp: 'lookUp',
+  ArrowDown: 'lookDown',
   ShiftLeft: null, // sprint deliberately unbound — FEEL.md F11
 };
 
@@ -82,11 +88,32 @@ export class InputCapture {
     this._keys = new Set();
     this._bound = {};
     this._locked = false;
+    // Engaged = the player has clicked into the game, whether or not pointer
+    // lock was granted. Mouse input is accepted while engaged OR locked.
+    //
+    // These were previously gated on _locked alone, which meant that anywhere
+    // pointer lock is unavailable — a sandboxed iframe, an embedded preview
+    // pane — aiming, FIRING and weapon swap were all silently dead while
+    // movement still worked. That is not a degraded experience, it is an
+    // unplayable one, and it was entirely self-inflicted.
+    this._engaged = false;
+    // Cursor offset from the canvas centre, used by the no-pointer-lock
+    // fallback in sample().
+    this._cursor = { x: 0, y: 0, inside: false };
     this._install();
   }
 
   get pointerLocked() {
     return this._locked;
+  }
+
+  get engaged() {
+    return this._engaged;
+  }
+
+  /** True when look is running on the rate-based fallback rather than raw deltas. */
+  get usingFallbackLook() {
+    return this._engaged && !this._locked;
   }
 
   _install() {
@@ -108,7 +135,7 @@ export class InputCapture {
       if (a === 'interact') this.state.interactHeld = 0;
     };
     b.mousedown = (e) => {
-      if (!this._locked) return;
+      if (!this._engaged && !this._locked) return;
       if (e.button === 0) this._press('fire');
       if (e.button === 2) this._press('scope');
       if (e.button === 1) this._press('melee');
@@ -119,6 +146,16 @@ export class InputCapture {
       if (e.button === 1) this._keys.delete('melee');
     };
     b.mousemove = (e) => {
+      // Track the cursor for the fallback regardless of engagement.
+      const r = this.el.getBoundingClientRect();
+      this._cursor.x = e.clientX - (r.left + r.width / 2);
+      this._cursor.y = e.clientY - (r.top + r.height / 2);
+      this._cursor.inside =
+        e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      this._cursor.halfW = r.width / 2;
+      this._cursor.halfH = r.height / 2;
+
+      // Locked: raw relative deltas, the correct FPS path.
       if (!this._locked) return;
       const s = this.sensitivity * (Math.PI / 180);
       this.state.lookYaw -= e.movementX * s;
@@ -126,16 +163,15 @@ export class InputCapture {
       if (e.movementX !== 0 || e.movementY !== 0) this.state.hasLookInput = true;
     };
     b.wheel = (e) => {
-      if (!this._locked) return;
+      if (!this._engaged && !this._locked) return;
       e.preventDefault();
       this._press('swap');
     };
     b.lockchange = () => {
       this._locked = document.pointerLockElement === this.el;
-      if (!this._locked) {
-        this._keys.clear();
-        this.state.reset();
-      }
+      // Do NOT clear engagement when lock drops — that is exactly the state the
+      // fallback exists to serve.
+      if (!this._locked) this._keys.clear();
     };
     b.contextmenu = (e) => e.preventDefault();
 
@@ -163,17 +199,28 @@ export class InputCapture {
   }
 
   requestLock() {
+    // Engagement is unconditional: the player clicked, so the game takes input.
+    // Whether pointer lock is granted only decides WHICH look path runs.
+    this._engaged = true;
+
     // Chrome returns a Promise here and rejects it when the document is not a
-    // valid pointer-lock root — which is the normal case inside a sandboxed
-    // iframe such as an embedded preview pane. It is routine and non-fatal, so
-    // it must not reach the global error handler; unhandled, it papered the
-    // screen with SecurityError text on every click.
+    // valid pointer-lock root — the normal case inside a sandboxed iframe such
+    // as an embedded preview pane. Routine and non-fatal, so it must not reach
+    // the global error handler; unhandled, it papered the screen with
+    // SecurityError text on every click.
     try {
       const r = this.el.requestPointerLock?.();
       if (r && typeof r.catch === 'function') r.catch(() => {});
     } catch {
-      /* pointer lock unavailable — mouse look is simply disabled */
+      /* fall through to the rate-based look in sample() */
     }
+  }
+
+  release() {
+    this._engaged = false;
+    this._keys.clear();
+    this.state.reset();
+    if (document.pointerLockElement === this.el) document.exitPointerLock?.();
   }
 
   /** True when mouse look is actually possible in this document. */
@@ -185,6 +232,43 @@ export class InputCapture {
   sample(dt) {
     const k = this._keys;
     const s = this.state;
+
+    // ---- look ------------------------------------------------------------
+    // With pointer lock, mousemove already accumulated exact relative deltas.
+    // Without it, relative deltas are useless: the cursor runs out of screen
+    // and turning simply stops. So the fallback treats the cursor's offset
+    // from the canvas centre as a RATE, with a dead zone — you push the mouse
+    // toward the edge to keep turning, and it never runs out of room.
+    if (this._engaged && !this._locked && this._cursor.inside) {
+      const DEAD = 0.12;
+      const RATE = 3.2; // radians/second at full deflection
+      const nx = this._cursor.x / Math.max(this._cursor.halfW || 1, 1);
+      const ny = this._cursor.y / Math.max(this._cursor.halfH || 1, 1);
+      const shape = (v) => {
+        const a = Math.abs(v);
+        if (a <= DEAD) return 0;
+        const t = (a - DEAD) / (1 - DEAD);
+        return Math.sign(v) * t * t; // quadratic: precise near centre
+      };
+      const dx = shape(Math.max(-1, Math.min(1, nx)));
+      const dy = shape(Math.max(-1, Math.min(1, ny)));
+      if (dx !== 0 || dy !== 0) {
+        s.lookYaw -= dx * RATE * dt;
+        s.lookPitch -= dy * RATE * dt * (this.invertY ? -1 : 1);
+        s.hasLookInput = true;
+      }
+    }
+
+    // Arrow keys always look, in either mode. Guarantees the game is aimable
+    // even where the mouse cannot be used at all.
+    const KEY_RATE = 2.2;
+    let ax = (k.has('lookRight') ? 1 : 0) - (k.has('lookLeft') ? 1 : 0);
+    let ay = (k.has('lookDown') ? 1 : 0) - (k.has('lookUp') ? 1 : 0);
+    if (ax !== 0 || ay !== 0) {
+      s.lookYaw -= ax * KEY_RATE * dt;
+      s.lookPitch -= ay * KEY_RATE * dt * (this.invertY ? -1 : 1);
+      s.hasLookInput = true;
+    }
     s.moveX = (k.has('right') ? 1 : 0) - (k.has('left') ? 1 : 0);
     s.moveZ = (k.has('fwd') ? 1 : 0) - (k.has('back') ? 1 : 0);
     s.jump = k.has('jump');

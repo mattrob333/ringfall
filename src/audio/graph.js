@@ -10,7 +10,11 @@ import { createImpulseResponse } from './noise.js';
  */
 export function buildMixerGraph(ctx, rngStream) {
   const master = ctx.createGain();
-  master.gain.value = 1;
+  // 0.5, not 1.0. Every cue is synthesized and summed through one limiter, and
+  // at unity a firefight rides the limiter continuously, which is what makes
+  // procedural audio read as harsh rather than loud. This is a starting point
+  // set without being able to hear it — see HONEST_ASSESSMENT.md.
+  master.gain.value = 0.5;
 
   // Master limiter — a grenade must never clip the mix.
   const limiter = ctx.createDynamicsCompressor();

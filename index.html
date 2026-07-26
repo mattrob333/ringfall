@@ -19,7 +19,14 @@
       }
       #boot.hidden { opacity: 0; pointer-events: none; }
       #boot b { display: block; font-size: 30px; letter-spacing: 0.4em; margin-bottom: 18px; font-weight: 600; }
-      #boot small { display: block; margin-top: 20px; opacity: 0.55; letter-spacing: 0.1em; }
+      #boot small { display: block; margin-top: 20px; opacity: 0.6; letter-spacing: 0.06em; line-height: 2; }
+      #boot em { font-style: normal; color: #ffc24a; }
+      #lookmode {
+        position: fixed; left: 50%; transform: translateX(-50%); bottom: 14px; z-index: 5;
+        font: 500 11px/1.5 ui-monospace, monospace; letter-spacing: 0.14em;
+        color: #ffc24a; background: rgba(10,16,20,0.72); padding: 6px 14px;
+        border: 1px solid rgba(255,194,74,0.35); display: none; pointer-events: none;
+      }
       #err {
         position: fixed; inset: auto 0 0 0; max-height: 45%; overflow: auto; z-index: 20;
         background: #2a0d0d; color: #ffb4a4; font: 12px/1.5 ui-monospace, monospace;
@@ -32,7 +39,17 @@
       <canvas id="gl"></canvas>
       <canvas id="hud"></canvas>
     </div>
-    <div id="boot"><span><b>RINGFALL</b>INITIALISING<small>click to play &middot; wasd move &middot; space jump</small></span></div>
+    <div id="boot">
+      <span>
+        <b>RINGFALL</b>CLICK TO PLAY
+        <small>
+          WASD move &middot; SPACE jump &middot; CTRL crouch &middot; MOUSE aim &middot; LMB fire &middot; RMB scope<br />
+          F melee &middot; G grenade &middot; X switch grenade &middot; R reload &middot; Q swap &middot; E interact<br />
+          ARROWS also aim &middot; M mute &middot; ESC release mouse
+        </small>
+      </span>
+    </div>
+    <div id="lookmode">POINTER LOCK UNAVAILABLE &mdash; EDGE-STEER AIM ACTIVE &middot; ARROW KEYS ALSO AIM</div>
     <pre id="err"></pre>
     <script type="module" src="/src/main.js"></script>
   </body>

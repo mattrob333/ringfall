@@ -172,6 +172,17 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
     startAudio();
   });
 
+  // M mutes. Escape releases the mouse so the page is usable again.
+  let muted = false;
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyM') {
+      muted = !muted;
+      audio.setMasterVolume?.(muted ? 0 : 0.5);
+    } else if (e.code === 'Escape') {
+      capture.release();
+    }
+  });
+
   // ---- camera binding -----------------------------------------------------
   const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
   // Capture-only free camera. Without it every baseline shot renders from the
@@ -299,6 +310,13 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
     input.endFrame();
     frames++;
     if (frames === 3 && bootEl && !DETERMINISTIC) bootEl.classList.add('hidden');
+
+    // Tell the player which aim path is live rather than leaving them to guess
+    // why the mouse behaves differently from every other shooter.
+    if (!DETERMINISTIC && (frames & 15) === 0) {
+      const el = document.getElementById('lookmode');
+      if (el) el.style.display = capture.usingFallbackLook ? 'block' : 'none';
+    }
   }
 
   syncCamera();
@@ -328,6 +346,7 @@ export async function boot({ glCanvas, hudCanvas, bootEl }) {
     // The SAME InputState the controller reads, so a scripted test cannot
     // accidentally exercise a different code path than a human does.
     driveInput: input,
+    capture,
     setCamera(pos, yaw, pitch) {
       camOverride = { pos, yaw, pitch };
       syncCamera();
