@@ -1,0 +1,194 @@
+@import 'tailwindcss';
+
+/**
+ * MERIDIAN design tokens.
+ *
+ * The whole product is one room lit by one source: the globe. Everything else
+ * is glass and brass sitting in that light. Two rules hold it together —
+ *   1. Surfaces are near-black and translucent. Never grey, never opaque.
+ *   2. Colour is reserved for data. Chrome is monochrome + brass.
+ *
+ * No external font or image assets: CDN egress is blocked in this environment
+ * and, more importantly, a product that renders identically offline is a
+ * better product. Type is system stacks, avatars are generated, the globe is
+ * vector geometry.
+ */
+
+@theme {
+  /* ── Surfaces ─────────────────────────────────────────────────────── */
+  --color-void: #04050a;
+  --color-abyss: #070911;
+  --color-obsidian: #0b0e18;
+  --color-slate-deep: #121624;
+  --color-slate: #1a1f31;
+  --color-slate-lift: #232941;
+
+  /* ── Ink ──────────────────────────────────────────────────────────── */
+  --color-ink: #f4f1ea;
+  --color-ink-muted: #a8a598;
+  --color-ink-faint: #6b6a63;
+  --color-ink-ghost: #3d3f47;
+
+  /* ── Brass: the house metal. Chrome, rules, active states. ────────── */
+  --color-brass: #c8a866;
+  --color-brass-bright: #e6cf9b;
+  --color-brass-deep: #8a7038;
+  --color-brass-wash: #c8a8661a;
+
+  /* ── Heat ramp: cold anticipation → white-hot. Data only. ─────────── */
+  --color-heat-smoldering: #3d6fa8;
+  --color-heat-warm: #4fa3c7;
+  --color-heat-hot: #d9a441;
+  --color-heat-blazing: #e8703a;
+  --color-heat-supernova: #fff0c4;
+
+  /* ── Semantic ─────────────────────────────────────────────────────── */
+  --color-signal: #5ee0c8;
+  --color-commit: #7ee787;
+  --color-alert: #e8703a;
+
+  /* ── Type ─────────────────────────────────────────────────────────── */
+  --font-display: 'Didot', 'Bodoni MT', 'Playfair Display', 'Hoefler Text',
+    Garamond, 'Times New Roman', serif;
+  --font-sans: ui-sans-serif, -apple-system, 'Segoe UI', Inter, Helvetica, Arial,
+    sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+
+  /* ── Motion: slow and weighted. Nothing in this product is in a hurry. */
+  --ease-glide: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-instant: 120ms;
+  --duration-quick: 240ms;
+  --duration-considered: 520ms;
+  --duration-cinematic: 1400ms;
+}
+
+@layer base {
+  * {
+    border-color: color-mix(in oklab, var(--color-ink) 8%, transparent);
+  }
+
+  html,
+  body {
+    height: 100%;
+    background: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
+  }
+
+  body {
+    /* A faint warm bloom from the globe's position, so the page never reads
+       as flat black even before WebGL paints. */
+    background-image: radial-gradient(
+      ellipse 120% 80% at 50% 55%,
+      #0d1220 0%,
+      var(--color-void) 60%
+    );
+  }
+
+  ::selection {
+    background: var(--color-brass);
+    color: var(--color-void);
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-ink-ghost);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-faint);
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--color-brass);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /* Small caps tracking used for every label in the product. */
+  .label {
+    font-size: 0.625rem;
+    line-height: 1;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .label-sm {
+    font-size: 0.5625rem;
+    line-height: 1;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .font-display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.015em;
+  }
+
+  .tabular {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  /* The house surface: black glass with a lit top edge. */
+  .glass {
+    background: color-mix(in oklab, var(--color-obsidian) 82%, transparent);
+    backdrop-filter: blur(24px) saturate(1.3);
+    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    border: 1px solid color-mix(in oklab, var(--color-ink) 7%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklab, var(--color-ink) 6%, transparent),
+      0 24px 64px -24px #000;
+  }
+
+  .glass-deep {
+    background: color-mix(in oklab, var(--color-abyss) 92%, transparent);
+    backdrop-filter: blur(40px) saturate(1.4);
+    -webkit-backdrop-filter: blur(40px) saturate(1.4);
+    border: 1px solid color-mix(in oklab, var(--color-ink) 8%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklab, var(--color-ink) 7%, transparent),
+      0 40px 120px -32px #000;
+  }
+
+  .hairline {
+    border-color: color-mix(in oklab, var(--color-ink) 8%, transparent);
+  }
+
+  .brass-rule {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--color-brass-deep) 20%,
+      var(--color-brass) 50%,
+      var(--color-brass-deep) 80%,
+      transparent
+    );
+  }
+
+  /* Respect the user. Nothing here is essential motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
