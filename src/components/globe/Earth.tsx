@@ -116,11 +116,19 @@ void main() {
   vec3 col = mix(uNight, uDay, day);
   col += uDay * lambert * 0.35;
 
-  // Night side: uneven warm patches. Two octaves, sharpened so most of the
-  // surface stays dark and only a minority of it lifts.
-  float lights = valueNoise(N * 13.0) * 0.68 + valueNoise(N * 37.0) * 0.32;
-  lights = smoothstep(0.52, 0.86, lights);
-  col += uGlow * lights * (1.0 - day) * 0.55;
+  // Night side: scattered warm settlement glow.
+  //
+  // Frequency is the whole game here. At 13 cycles across the globe each noise
+  // cell is ~3000km, so the "lights" came out as continent-sized clouds that
+  // read as a blurry heightmap rather than as inhabited land. 96 puts a cell at
+  // roughly 400km — small enough to read as clusters at this camera distance,
+  // and still far below the point where value noise starts to alias when the
+  // globe is zoomed out. The threshold is tightened alongside it so only the
+  // top of the noise range lifts and most of the night side stays genuinely
+  // dark; without that, raising the frequency just produces uniform haze.
+  float lights = valueNoise(N * 96.0) * 0.62 + valueNoise(N * 232.0) * 0.38;
+  lights = smoothstep(0.60, 0.90, lights);
+  col += uGlow * lights * (1.0 - day) * 0.5;
 
   col += uDusk * duskBand(sun, 0.13) * 0.22;
 

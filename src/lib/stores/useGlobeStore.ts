@@ -51,7 +51,9 @@ export const useGlobeStore = create<GlobeState>((set, get) => ({
 
   select: (id) => set({ selectedEventId: id, autoRotate: id ? false : get().autoRotate }),
   hover: (id) => set({ hoveredEventId: id }),
-  flyTo: (target, distance = 2.15) =>
+  // 3.5 subtends ~33 degrees against the Canvas's 34 degree vertical FOV, so a
+  // focused event fills the frame without the limb spilling off screen.
+  flyTo: (target, distance = 3.5) =>
     set((s) => ({
       flight: { target, distance, nonce: (s.flight?.nonce ?? 0) + 1 },
       autoRotate: false,

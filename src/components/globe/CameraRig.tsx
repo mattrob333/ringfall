@@ -31,7 +31,7 @@ import { bindCursorTarget, setCursor } from './cursor';
 const R = GLOBE_RADIUS;
 
 export const MIN_DISTANCE = 1.35;
-export const MAX_DISTANCE = 4.5;
+export const MAX_DISTANCE = 5.5;
 
 /** Matches `--duration-cinematic`. */
 const FLIGHT_MS = 1400;
@@ -83,14 +83,22 @@ function slerpUnit(
 }
 
 export interface CameraRigProps {
-  /** Opening camera distance, in globe radii. */
+  /**
+   * Opening camera distance, in globe radii.
+   *
+   * The globe subtends `2·asin(1/d)` degrees, so with the 34° vertical FOV set
+   * on the Canvas anything closer than d≈3.42 overflows the viewport and the
+   * planet reads as a wall rather than a world. 3.9 puts the sphere at ~87% of
+   * frame height: the limb and the terminator both stay visible, which is the
+   * whole shot.
+   */
   initialDistance?: number;
   initialLat?: number;
   initialLon?: number;
 }
 
 function CameraRigImpl({
-  initialDistance = 2.85,
+  initialDistance = 3.9,
   initialLat = 24,
   initialLon = 8,
 }: CameraRigProps) {

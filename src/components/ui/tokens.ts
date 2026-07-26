@@ -158,34 +158,59 @@ const UTC = { timeZone: 'UTC' } as const;
 
 const parse = (iso: string): Date => new Date(`${iso}T00:00:00Z`);
 
-const fmtDay = new Intl.DateTimeFormat('en-GB', {
-  ...UTC,
-  day: '2-digit',
-  month: 'short',
-});
-const fmtDayYear = new Intl.DateTimeFormat('en-GB', {
-  ...UTC,
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-});
-const fmtFull = new Intl.DateTimeFormat('en-GB', {
-  ...UTC,
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-});
-const fmtMonth = new Intl.DateTimeFormat('en-GB', { ...UTC, month: 'short' });
+/**
+ * Dates are formatted by hand rather than through `Intl.DateTimeFormat`.
+ *
+ * This is not premature cleverness — it fixes a real hydration failure. Node
+ * and Chromium ship different ICU versions, and they disagree about `en-GB`
+ * long dates: Node emits `Sunday, 26 July 2026` and the browser emits
+ * `Sunday 26 July 2026`. React sees the server text and the client text differ
+ * by one comma and throws away the whole tree (error #418). Any locale-aware
+ * formatter rendered during SSR is exposed to the same class of drift on the
+ * next ICU bump.
+ *
+ * These tables are the product's house date style, they are UTC-anchored so a
+ * traveller's own timezone cannot shift an event's date, and they produce
+ * byte-identical output everywhere forever.
+ */
+const MONTHS_SHORT = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+] as const;
+
+const MONTHS_LONG = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+] as const;
+
+const WEEKDAYS_LONG = [
+  'Sunday', 'Monday', 'Tuesday', 'Wednesday',
+  'Thursday', 'Friday', 'Saturday',
+] as const;
+
+const dd = (n: number): string => String(n).padStart(2, '0');
 
 /** `14 May 2027` */
-export const formatDate = (iso: string): string => fmtDayYear.format(parse(iso));
+export const formatDate = (iso: string): string => {
+  const d = parse(iso);
+  return `${dd(d.getUTCDate())} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+};
+
 /** `14 May` */
-export const formatDayMonth = (iso: string): string => fmtDay.format(parse(iso));
+export const formatDayMonth = (iso: string): string => {
+  const d = parse(iso);
+  return `${dd(d.getUTCDate())} ${MONTHS_SHORT[d.getUTCMonth()]}`;
+};
+
 /** `Friday 14 May 2027` — used where the date is the subject, not a stat. */
-export const formatDateFull = (iso: string): string => fmtFull.format(parse(iso));
+export const formatDateFull = (iso: string): string => {
+  const d = parse(iso);
+  return `${WEEKDAYS_LONG[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS_LONG[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+};
+
 /** `May` */
-export const formatMonth = (iso: string): string => fmtMonth.format(parse(iso));
+export const formatMonth = (iso: string): string =>
+  MONTHS_SHORT[parse(iso).getUTCMonth()];
 
 /**
  * A run of dates as a person would write it:

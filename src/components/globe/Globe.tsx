@@ -154,9 +154,9 @@ export function GlobeCanvas({
         preserveDrawingBuffer: false,
       }}
       // Matches CameraRig's opening pose exactly — latLonToVec3(24°N, 8°E,
-      // 2.85) — so frame zero is already the shot rather than a one-frame jump
+      // 3.9) — so frame zero is already the shot rather than a one-frame jump
       // to it.
-      camera={{ fov: 34, near: 0.02, far: 400, position: [2.578, 1.159, -0.362] }}
+      camera={{ fov: 34, near: 0.02, far: 400, position: [3.528, 1.586, -0.495] }}
       onCreated={({ gl, scene }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = 1.08;
