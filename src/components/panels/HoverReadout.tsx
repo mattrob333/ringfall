@@ -47,8 +47,18 @@ export function HoverReadout({ className }: HoverReadoutProps) {
   const reduced = useReducedMotion();
 
   const event = useEventById(shownId);
+
+  /**
+   * The readout used to stand down entirely whenever a dossier was open — "one
+   * reading surface at a time". That reads well as a rule and is wrong in
+   * practice: reading one event is exactly when you start pointing at the other
+   * lights to find out what they are, and suppressing it made the globe feel
+   * dead. It now only stands down for the event you are already reading, which
+   * is the actual duplication the rule was aimed at.
+   */
+  const duplicatesDossier = Boolean(selectedEventId && shownId === selectedEventId);
   const visible = Boolean(
-    shownId && hoveredEventId && !selectedEventId && pos && !overSurface,
+    shownId && hoveredEventId && !duplicatesDossier && pos && !overSurface,
   );
 
   useEffect(() => {

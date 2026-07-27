@@ -92,9 +92,34 @@ function BeaconPickerImpl({ registry, capacity }: BeaconPickerProps) {
     [],
   );
 
+  /**
+   * Pin the bounding sphere instead of letting three derive one.
+   *
+   * `InstancedMesh.raycast()` early-outs against `boundingSphere`, and it only
+   * ever computes that sphere when it is `null`. On the first frame `count` is
+   * still 0, so the derived sphere is empty — and because it is then non-null
+   * it is never recomputed. Every ray after that is rejected before a single
+   * instance is tested, which presents as pick targets that are visibly in the
+   * right place and completely unhittable.
+   *
+   * Every target sits at `R + r*0.55` with `r` capped at `PICK_MAX`, so
+   * everything is inside 1.2 radii. A fixed sphere is both correct and cheaper
+   * than recomputing over 241 instances whenever the count changes.
+   */
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (mesh) mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1.2);
+  }, []);
+
   useFrame(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
+
+    // Re-pin defensively: three nulls this out on some geometry mutations, and
+    // a null here silently restores the original bug.
+    if (!mesh.boundingSphere) {
+      mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1.2);
+    }
 
     const { matrix, position, quaternion, scale } = scratch;
     const dist = camera.position.length();
