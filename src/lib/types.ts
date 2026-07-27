@@ -124,6 +124,22 @@ export interface WorldEvent {
   venues: string[];
   nearestJetPort: Airport;
 
+  /**
+   * Days before `start` by which you must have committed to get the *good*
+   * version of this trip — the chalet rather than the hotel, the terrace rather
+   * than the grandstand, the camp on the river rather than two hours from it.
+   *
+   * This is not "when tickets sell out". It is when the scarce, non-scalable
+   * part goes: eight beds on the Sabi Sand, a table at the Kufflers Weinzelt,
+   * a Debenture on Centre Court. It varies enormously by category — a Michelin
+   * three-star is a month, a Serengeti river-crossing camp is most of a year —
+   * which is exactly why it is worth knowing.
+   *
+   * Optional. When absent, the alerts engine falls back to the documented
+   * per-category default in `src/lib/alerts/leadTimes.ts`.
+   */
+  bookingLeadDays?: number;
+
   /** 2–4 sentences. Written for someone deciding, not searching. */
   description: string;
   /** 3–5 short reasons, each ≤ 80 chars, no trailing period */

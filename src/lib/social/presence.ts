@@ -144,11 +144,17 @@ export function setPresencePaused(next: boolean): void {
 
 export const isPresencePaused = (): boolean => paused;
 
-/** Test/verification hook. Resets the tick and stops the timer. */
+/**
+ * Test/verification hook. Winds the clock back to zero. Any live subscribers
+ * keep their subscription and the timer restarts under them, so this is safe
+ * to call from a running app as well as from a script.
+ */
 export function resetPresence(): void {
   halt();
   tick = 0;
   paused = false;
+  for (const l of listeners) l();
+  ensureRunning();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

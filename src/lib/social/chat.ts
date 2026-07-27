@@ -87,6 +87,9 @@ const MONTHS = [
 
 const firstName = (name: string): string => name.split(' ')[0] ?? name;
 
+/** `Autódromo José Carlos Pace, Interlagos` → `Autódromo José Carlos Pace`. */
+const shortVenue = (venue: string): string => (venue.split(/,\s+/)[0] ?? venue).trim();
+
 interface ThreadCtx {
   group: TravelGroup;
   event: WorldEvent;
@@ -225,7 +228,7 @@ const LINES: Record<Topic, readonly Line[]> = {
         `Down for it. Same as last year, assuming last year is the benchmark and not the warning.`,
     },
     {
-      say: (t) => `Confirmed. The ${t.c.dayBack} return suits me, I have nothing on the Monday.`,
+      say: (t) => `Confirmed. The ${t.c.dayBack} return suits me — I have kept the week after clear.`,
     },
     { say: () => `In, and I am bringing nobody. Learned that lesson.` },
     {
@@ -240,6 +243,22 @@ const LINES: Record<Topic, readonly Line[]> = {
     },
     {
       say: () => `Put me down. I have not been in three years and I have run out of excuses.`,
+    },
+    {
+      ok: away,
+      say: (t) => `In. Nothing in ${t.me.homeBase.city} that week is more interesting than this.`,
+    },
+    {
+      say: () => `Count me in, and I will not be difficult about the timings this year.`,
+    },
+    {
+      ok: named,
+      say: (t) =>
+        `In. ${t.otherFirst} told me about this one before you posted it, so I have had the dates blocked for a fortnight.`,
+    },
+    {
+      say: (t) =>
+        `Yes. Send the slot the moment it firms up and I will hold the ${t.c.day} clear either side.`,
     },
   ],
 
@@ -353,7 +372,7 @@ const LINES: Record<Topic, readonly Line[]> = {
     {
       ok: away,
       say: (t) =>
-        `I need to be back in ${t.me.homeBase.city} by the Monday morning. If the ${t.c.dayBack} slips I will go commercial and say nothing more about it.`,
+        `I have to be back in ${t.me.homeBase.city} the morning after we land. If the ${t.c.dayBack} slips I will go commercial and say nothing more about it.`,
     },
     {
       ok: crowd,
@@ -627,8 +646,10 @@ export function buildThread(group: TravelGroup, event: WorldEvent): ChatMessage[
     quorum: group.quorum,
     filled,
     seatsLeft: Math.max(0, group.capacity - filled),
-    venue: event.venues[0] ?? event.name,
-    venue2: event.venues[1] ?? event.venues[0] ?? event.name,
+    // Venues are recorded formally ("Autódromo José Carlos Pace, Interlagos").
+    // People say the first half of that and nothing else.
+    venue: shortVenue(event.venues[0] ?? event.name),
+    venue2: shortVenue(event.venues[1] ?? event.venues[0] ?? event.name),
     hours: Math.max(
       1,
       Math.round(greatCircleDistanceNm(host.homeBase.coords, event.coords) / 460),

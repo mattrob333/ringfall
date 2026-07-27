@@ -9,19 +9,42 @@ import {
   cn,
   EmptyState,
   formatDateRange,
+  formatDaysUntil,
   Rule,
   ScrollArea,
   Sheet,
+  Toggle,
 } from '@/components/ui';
 import { EVENT_INDEX } from '@/lib/data/events';
-import { MEMBER_INDEX, resolveVoucher, type MemberDossier } from '@/lib/social/members';
+import {
+  distanceToGateway,
+  gatewayFor,
+  MEMBER_INDEX,
+  nearestGateway,
+  resolveVoucher,
+  searchGateways,
+  toHomeBase,
+  type Gateway,
+  type MemberDossier,
+} from '@/lib/social/members';
+import {
+  describeNotification,
+  useActivityFeed,
+  type ActivityNotification,
+} from '@/lib/social/notifications';
 import { useProfileUiStore } from '@/lib/social/profileStore';
 import { getSimulation } from '@/lib/social/simulation';
-import { useSocialHydration, useSocialStore } from '@/lib/social/useSocialStore';
+import {
+  INVITE_ALLOWANCE,
+  socialSnapshot,
+  useSocialHydration,
+  useSocialStore,
+} from '@/lib/social/useSocialStore';
 import { useGlobeStore } from '@/lib/stores/useGlobeStore';
-import type { EventCategory, InterestLevel, TravelGroup, WorldEvent } from '@/lib/types';
+import { EVENT_CATEGORIES } from '@/lib/types';
+import type { EventCategory, InterestLevel, Member, TravelGroup, WorldEvent } from '@/lib/types';
 import { InviteDialog } from './InviteDialog';
-import { MemberPortrait } from './MemberPortrait';
+import { MemberPortrait, PortraitField } from './MemberPortrait';
 import { MEMBER_TIER_LABEL, MemberTierMark } from './MemberTierMark';
 import { TripLinkReader } from './ShareTrip';
 
@@ -45,17 +68,21 @@ export interface MemberProfileSheetProps {
  * from. Nothing is invented at the point of display.
  */
 export function MemberProfileSheet({ memberId, open, onClose }: MemberProfileSheetProps) {
-  const member = MEMBER_INDEX.get(memberId);
+  const meId = useSocialStore((s) => s.currentMember.id);
+  const isSelf = memberId === meId;
+  const member = isSelf ? undefined : MEMBER_INDEX.get(memberId);
 
   return (
     <Sheet
       open={open}
       onClose={onClose}
-      label={member ? `${member.name} — member record` : 'Member record'}
+      label={isSelf ? 'Your record' : member ? `${member.name} — member record` : 'Member record'}
       width="min(30rem, 94vw)"
       scrim
     >
-      {member ? (
+      {isSelf ? (
+        <SelfProfileBody onClose={onClose} />
+      ) : member ? (
         <ProfileBody member={member} onClose={onClose} />
       ) : (
         <EmptyState
@@ -537,6 +564,680 @@ function joinWords(words: readonly string[]): string {
   if (words.length <= 1) return words[0] ?? '';
   if (words.length === 2) return `${words[0]} and ${words[1]}`;
   return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Your own record
+// ─────────────────────────────────────────────────────────────────────────────
+
+const LEVEL_ORDER: readonly InterestLevel[] = ['committed', 'interested', 'watching'];
+
+const LEVEL_HEADING: Record<InterestLevel, string> = {
+  committed: 'Going',
+  interested: 'Interested',
+  watching: 'Watching',
+};
+
+interface TripRow {
+  event: WorldEvent;
+  level: InterestLevel;
+  group: TravelGroup | undefined;
+  peers: number;
+  daysUntil: number;
+}
+
+/**
+ * The member's own record.
+ *
+ * Ordered the way he actually uses it: what has happened since he last looked,
+ * then where he is going, and only then the settings. The old version led with
+ * a scrolling list of airports, which is a configuration screen wearing a
+ * profile's clothes — everything to do with identity is now folded into one
+ * disclosure at the foot.
+ */
+function SelfProfileBody({ onClose }: { onClose: () => void }) {
+  const hydrated = useSocialHydration();
+  const me = useSocialStore((s) => s.currentMember);
+  const interests = useSocialStore((s) => s.interests);
+  const groups = useSocialStore((s) => s.groups);
+  const drip = useSocialStore((s) => s.dripRevealed);
+  const invitesRemaining = useSocialStore((s) => s.invitesRemaining);
+  const select = useGlobeStore((s) => s.select);
+  const flyTo = useGlobeStore((s) => s.flyTo);
+  const openProfile = useProfileUiStore((s) => s.openProfile);
+  const voucher = resolveVoucher(me.verifiedBy);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const openEvent = (event: WorldEvent): void => {
+    select(event.id);
+    flyTo(event.coords);
+    onClose();
+  };
+
+  // ── The itinerary ────────────────────────────────────────────────────────
+  // Everything he has signalled on that has not finished, with the cabin he is
+  // on and how many members are on the same fixture. Peer counts come off the
+  // snapshot rather than a per-row hook — one row per event, and hooks cannot
+  // live in a loop.
+  const trips = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const snap = socialSnapshot();
+    const rows: TripRow[] = [];
+    for (const signal of interests) {
+      const event = EVENT_INDEX.get(signal.eventId);
+      if (!event || event.end < today) continue;
+      rows.push({
+        event,
+        level: signal.level,
+        group: groups.find(
+          (g) => g.eventId === event.id && g.members.some((m) => m.memberId === me.id),
+        ),
+        peers: snap.peerCountFor(event.id),
+        daysUntil: Math.round(
+          (Date.parse(`${event.start}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000,
+        ),
+      });
+    }
+    rows.sort((a, b) => (a.event.start < b.event.start ? -1 : 1));
+    return rows;
+    // `drip` is in the dependency list because `peerCountFor` reads it off the
+    // snapshot — the count has to move when the club does.
+  }, [interests, groups, me.id, drip]);
+
+  const grouped = useMemo(
+    () => LEVEL_ORDER.map((level) => ({ level, rows: trips.filter((t) => t.level === level) })),
+    [trips],
+  );
+
+  const gateway = gatewayFor(me.homeBase.homeJetPort);
+
+  return (
+    <ScrollArea className="h-full" contentClassName="flex flex-col gap-5 p-5 pb-8">
+      {/* ── Who you are, in three lines ───────────────────────────────── */}
+      <header className="flex items-center gap-3.5">
+        <MemberPortrait
+          seed={me.avatarSeed}
+          name={me.name}
+          size={56}
+          accented
+          {...(hydrated && me.photoUrl ? { photoUrl: me.photoUrl } : {})}
+          decorative
+        />
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display truncate text-[22px] leading-7 text-ink">
+            {hydrated ? me.name : ' '}
+          </h2>
+          <div className="mt-2 flex items-center gap-2">
+            <MemberTierMark tier={me.tier} />
+            <span className="label-sm text-ink-muted">
+              {MEMBER_TIER_LABEL[me.tier]} · {me.homeBase.city} · {me.homeBase.homeJetPort}
+            </span>
+          </div>
+          {me.verifiedBy && (
+            <p className="mt-2 text-[11px] leading-4 text-ink-faint">
+              Vouched in by{' '}
+              {voucher ? (
+                <button
+                  type="button"
+                  onClick={() => openProfile(voucher.id)}
+                  className="text-brass underline-offset-2 transition-colors hover:text-brass-bright hover:underline"
+                >
+                  {voucher.name}
+                </button>
+              ) : (
+                <span className="text-ink-muted">{me.verifiedBy}</span>
+              )}
+            </p>
+          )}
+        </div>
+      </header>
+
+      <Rule variant="brass" />
+
+      {/* ── What happened while you were away ─────────────────────────── */}
+      <ActivitySection onOpenEvent={openEvent} onClose={onClose} />
+
+      {/* ── The itinerary ─────────────────────────────────────────────── */}
+      <section>
+        <div className="flex items-baseline justify-between gap-4">
+          <p className="label text-ink-muted">My trips</p>
+          <p className="tabular text-[11px] text-ink-faint">
+            {hydrated ? `${trips.length} on the calendar` : ''}
+          </p>
+        </div>
+
+        {!hydrated ? (
+          <div className="h-24" aria-hidden />
+        ) : trips.length === 0 ? (
+          <EmptyState
+            className="px-0"
+            title="Nothing on your calendar yet"
+            body="Signal on anything from the globe or the index — watching, interested, going — and it lands here with the cabins forming around it."
+            action={
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                Back to the globe
+              </Button>
+            }
+          />
+        ) : (
+          <div className="mt-3 flex flex-col gap-4">
+            {grouped.map(({ level, rows }) =>
+              rows.length === 0 ? null : (
+                <div key={level}>
+                  <div className="flex items-baseline gap-2">
+                    <span
+                      className={cn(
+                        'label',
+                        level === 'committed' ? 'text-brass' : 'text-ink-faint',
+                      )}
+                    >
+                      {LEVEL_HEADING[level]}
+                    </span>
+                    <span className="tabular text-[11px] text-ink-ghost">{rows.length}</span>
+                  </div>
+                  <ul className="mt-2 flex flex-col">
+                    {rows.map((row, i) => (
+                      <li key={row.event.id}>
+                        {i > 0 && <Rule variant="ghost" />}
+                        <TripRowButton row={row} onOpen={openEvent} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ),
+            )}
+          </div>
+        )}
+      </section>
+
+      <Rule />
+
+      {/* ── Identity and settings, folded away ────────────────────────── */}
+      <section>
+        <button
+          type="button"
+          onClick={() => setSettingsOpen((v) => !v)}
+          aria-expanded={settingsOpen}
+          className="flex w-full items-baseline justify-between gap-4 text-left"
+        >
+          <span className="label text-ink-muted">Your record</span>
+          <span className="label-sm text-ink-faint">{settingsOpen ? 'Hide' : 'Edit'}</span>
+        </button>
+
+        {!settingsOpen ? (
+          <p className="mt-2.5 text-[11px] leading-4 text-ink-faint">
+            {me.homeBase.city} · {me.homeBase.homeJetPort}
+            {gateway ? ` · ${gateway.fboQuality} FBO` : ''} · {me.interests.length} interests ·{' '}
+            {hydrated ? `${invitesRemaining} of ${INVITE_ALLOWANCE} invitations left` : ''}
+          </p>
+        ) : (
+          <SelfSettings />
+        )}
+      </section>
+
+      <div className="mt-auto flex justify-end pt-2">
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          Close
+        </Button>
+      </div>
+    </ScrollArea>
+  );
+}
+
+function TripRowButton({ row, onOpen }: { row: TripRow; onOpen: (e: WorldEvent) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(row.event)}
+      className="group flex w-full items-start justify-between gap-4 py-2.5 text-left"
+    >
+      <span className="min-w-0">
+        <span className="font-display block truncate text-[15px] leading-5 text-ink-muted transition-colors group-hover:text-ink">
+          {row.event.name}
+        </span>
+        <span className="label-sm mt-1.5 block truncate text-ink-ghost">
+          {row.event.city} · {formatDateRange(row.event.start, row.event.end)}
+          {row.group ? ` · ${row.group.name}` : ''}
+        </span>
+      </span>
+      <span className="flex shrink-0 flex-col items-end gap-1.5">
+        <span
+          className={cn(
+            'tabular text-[12px]',
+            row.daysUntil <= 21 ? 'text-brass' : 'text-ink-muted',
+          )}
+        >
+          {formatDaysUntil(row.daysUntil)}
+        </span>
+        <span className="label-sm text-ink-ghost">
+          {row.peers} {row.peers === 1 ? 'member' : 'members'}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Activity
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ActivitySection({
+  onOpenEvent,
+  onClose,
+}: {
+  onOpenEvent: (event: WorldEvent) => void;
+  onClose: () => void;
+}) {
+  const hydrated = useSocialHydration();
+  const feed = useActivityFeed();
+  const markActivityRead = useSocialStore((s) => s.markActivityRead);
+  const openProfile = useProfileUiStore((s) => s.openProfile);
+  const unread = feed.filter((n) => !n.read).length;
+
+  if (!hydrated || feed.length === 0) return null;
+
+  const act = (n: ActivityNotification): void => {
+    markActivityRead([n.id]);
+    if (n.kind === 'peer-interest' && n.memberId) {
+      openProfile(n.memberId);
+      return;
+    }
+    const event = EVENT_INDEX.get(n.eventId);
+    if (event) onOpenEvent(event);
+    else onClose();
+  };
+
+  return (
+    <section>
+      <div className="flex items-baseline justify-between gap-4">
+        <p className="label text-ink-muted">
+          Recent activity
+          {unread > 0 && <span className="ml-2 text-brass">{unread} new</span>}
+        </p>
+        {unread > 0 && (
+          <button
+            type="button"
+            onClick={() => markActivityRead(feed.map((n) => n.id))}
+            className="label-sm text-ink-faint transition-colors hover:text-ink"
+          >
+            Mark all read
+          </button>
+        )}
+      </div>
+
+      <ul className="mt-3 flex flex-col">
+        {feed.slice(0, 8).map((n, i) => {
+          const copy = describeNotification(n);
+          const member = n.memberId ? MEMBER_INDEX.get(n.memberId) : undefined;
+          return (
+            <li key={n.id}>
+              {i > 0 && <Rule variant="ghost" />}
+              <button
+                type="button"
+                onClick={() => act(n)}
+                className="group flex w-full items-center gap-3 py-2.5 text-left"
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    'size-1.5 shrink-0 rounded-full',
+                    n.read ? 'bg-transparent' : 'bg-brass',
+                  )}
+                />
+                {member ? (
+                  <MemberPortrait
+                    seed={member.avatarSeed}
+                    name={member.name}
+                    size={26}
+                    {...(member.photoUrl ? { photoUrl: member.photoUrl } : {})}
+                    decorative
+                  />
+                ) : null}
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span
+                    className={cn(
+                      'truncate text-[12px] leading-4',
+                      n.read ? 'text-ink-muted' : 'text-ink',
+                    )}
+                  >
+                    {copy.title}
+                  </span>
+                  <span className="label-sm truncate text-ink-ghost">{copy.detail}</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Settings
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SelfSettings() {
+  const me = useSocialStore((s) => s.currentMember);
+  const updateProfile = useSocialStore((s) => s.updateProfile);
+  const setPhoto = useSocialStore((s) => s.setPhoto);
+  const invitesRemaining = useSocialStore((s) => s.invitesRemaining);
+  const reset = useSocialStore((s) => s.reset);
+
+  const toggleCategory = (c: EventCategory): void => {
+    const next = me.interests.includes(c)
+      ? me.interests.filter((x) => x !== c)
+      : [...me.interests, c];
+    updateProfile({ interests: next });
+  };
+
+  return (
+    <div className="mt-4 flex flex-col gap-5">
+      <PortraitField
+        seed={me.avatarSeed}
+        name={me.name}
+        {...(me.photoUrl ? { photoUrl: me.photoUrl } : {})}
+        onChange={setPhoto}
+      />
+
+      <label className="flex flex-col gap-2">
+        <span className="label text-ink-muted">Name</span>
+        <input
+          value={me.name}
+          onChange={(e) => updateProfile({ name: e.target.value.slice(0, 48) })}
+          className={cn(
+            'font-display w-full rounded-[2px] border border-ink/10 bg-void/60 px-2.5 py-2',
+            'text-[15px] text-ink focus:border-brass-deep focus:outline-none',
+          )}
+        />
+      </label>
+
+      <HomeBaseField
+        homeBase={me.homeBase}
+        onChange={(homeBase) => updateProfile({ homeBase })}
+      />
+
+      <section>
+        <p className="label text-ink-muted">Interests</p>
+        <p className="mt-2 text-[11px] leading-4 text-ink-faint">
+          Ranks the calendar, and decides who shows up in your shared ground.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {EVENT_CATEGORIES.map((c) => {
+            const active = me.interests.includes(c);
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => toggleCategory(c)}
+                aria-pressed={active}
+                className={cn(
+                  'inline-flex h-6 items-center gap-1.5 rounded-[2px] border px-2 transition-colors',
+                  active
+                    ? 'border-brass bg-brass-wash text-brass'
+                    : 'border-ink/10 text-ink-faint hover:border-ink/25 hover:text-ink',
+                )}
+              >
+                <CategoryGlyph category={c} size={12} />
+                <span className="label-sm">{CATEGORY_LABEL[c]}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <Toggle
+        checked={me.openToJetShare}
+        onCheckedChange={(v) =>
+          useSocialStore.setState((s) => ({
+            currentMember: { ...s.currentMember, openToJetShare: v },
+          }))
+        }
+        label="Open to sharing a cabin"
+        hint="Members you have not met can see your signals and ask you onto a manifest."
+      />
+
+      <section className="border border-brass-deep/60 bg-brass-wash p-3.5">
+        <p className="label text-brass">Invitations</p>
+        <p className="font-display mt-2 text-[22px] leading-7 text-ink">
+          {invitesRemaining} of {INVITE_ALLOWANCE}
+        </p>
+        <p className="mt-2 text-[11px] leading-4 text-ink-muted">
+          Left this year. You cannot join MERIDIAN — you are vouched in by a member, and each
+          person you bring in spends one of these. Asking members already on the register costs
+          nothing.
+        </p>
+      </section>
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] leading-4 text-ink-faint">
+          Held on this device only. No account, no server copy.
+        </p>
+        <Button variant="quiet" size="sm" onClick={reset}>
+          Erase local record
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Home base
+// ─────────────────────────────────────────────────────────────────────────────
+
+type GeoState = 'idle' | 'locating' | 'denied' | 'unavailable' | 'far';
+
+/**
+ * Where the aircraft lives, as a question rather than a list.
+ *
+ * He types a place — a city, a region, a field, an ICAO — and it resolves to
+ * the gateway a private aircraft would actually use: "Miami" lands on
+ * Opa-locka, "Côte d'Azur" on Nice, "KTEB" on Teterboro. The alternative, and
+ * what this replaced, was a scrolling index of airports that ate the panel.
+ *
+ * Geolocation is offered but never taken: the browser prompt only ever fires
+ * from a click, and refusing it costs nothing but a quiet line of text.
+ */
+function HomeBaseField({
+  homeBase,
+  onChange,
+}: {
+  homeBase: Member['homeBase'];
+  onChange: (homeBase: Member['homeBase']) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [query, setQuery] = useState('');
+  const [highlight, setHighlight] = useState(0);
+  const [geo, setGeo] = useState<GeoState>('idle');
+  const [detected, setDetected] = useState<{ gateway: Gateway; nm: number } | null>(null);
+
+  const results = useMemo(() => (query.trim() ? searchGateways(query, 5) : []), [query]);
+  const current = gatewayFor(homeBase.homeJetPort);
+
+  const choose = (gateway: Gateway): void => {
+    onChange(toHomeBase(gateway));
+    setQuery('');
+    setEditing(false);
+    setGeo('idle');
+    setDetected(null);
+  };
+
+  const locate = (): void => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setGeo('unavailable');
+      return;
+    }
+    setGeo('locating');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const gateway = nearestGateway({
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+        });
+        const nm = distanceToGateway(
+          { lat: pos.coords.latitude, lon: pos.coords.longitude },
+          gateway,
+        );
+        setDetected({ gateway, nm });
+        // A long way from anything on the register is a real answer, not an
+        // error — offer it, say how far, and let him decide.
+        setGeo(nm > 400 ? 'far' : 'idle');
+      },
+      (err) => setGeo(err.code === err.PERMISSION_DENIED ? 'denied' : 'unavailable'),
+      { timeout: 8000, maximumAge: 600_000 },
+    );
+  };
+
+  return (
+    <section>
+      <div className="flex items-baseline justify-between gap-4">
+        <p className="label text-ink-muted">Home base</p>
+        <button
+          type="button"
+          onClick={() => setEditing((v) => !v)}
+          className="label-sm text-ink-faint transition-colors hover:text-ink"
+        >
+          {editing ? 'Cancel' : 'Change'}
+        </button>
+      </div>
+
+      <p className="mt-2.5 text-[13px] leading-5 text-ink">
+        {homeBase.city}
+        <span className="tabular ml-2 text-ink-faint">{homeBase.homeJetPort}</span>
+        {current && <span className="ml-2 text-[11px] text-ink-ghost">{current.name}</span>}
+      </p>
+      <p className="mt-1.5 text-[11px] leading-4 text-ink-faint">
+        {current ? `${current.fboQuality} FBO · ` : ''}
+        Every charter quote in the product is priced from here.
+      </p>
+
+      {editing && (
+        <div className="mt-3">
+          <div className="relative">
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setHighlight(0);
+              }}
+              onKeyDown={(e) => {
+                if (results.length === 0) return;
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  setHighlight((h) => (h + 1) % results.length);
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setHighlight((h) => (h - 1 + results.length) % results.length);
+                } else if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const hit = results[highlight];
+                  if (hit) choose(hit.gateway);
+                } else if (e.key === 'Escape') {
+                  // The sheet also closes on Escape. Clearing the suggestions
+                  // first is what the member means by it here.
+                  e.stopPropagation();
+                  setQuery('');
+                }
+              }}
+              placeholder="City, region, airport or ICAO — “Miami”, “Côte d’Azur”, “KTEB”"
+              aria-label="Search for your home gateway"
+              aria-autocomplete="list"
+              aria-expanded={results.length > 0}
+              role="combobox"
+              aria-controls="meridian-gateway-list"
+              className={cn(
+                'w-full rounded-[2px] border border-ink/10 bg-void/60 px-2.5 py-2',
+                'text-[13px] text-ink placeholder:text-ink-ghost',
+                'focus:border-brass-deep focus:outline-none',
+              )}
+            />
+          </div>
+
+          {results.length > 0 && (
+            <ul
+              id="meridian-gateway-list"
+              role="listbox"
+              className="mt-2 flex flex-col border border-ink/10 bg-obsidian/70"
+            >
+              {results.map((match, i) => (
+                <li key={match.gateway.code} role="option" aria-selected={i === highlight}>
+                  <button
+                    type="button"
+                    onMouseEnter={() => setHighlight(i)}
+                    onClick={() => choose(match.gateway)}
+                    className={cn(
+                      'flex w-full items-baseline justify-between gap-3 px-2.5 py-2 text-left',
+                      i === highlight ? 'bg-brass-wash' : '',
+                    )}
+                  >
+                    <span className="min-w-0">
+                      <span
+                        className={cn(
+                          'block truncate text-[13px] leading-4',
+                          i === highlight ? 'text-brass' : 'text-ink',
+                        )}
+                      >
+                        {match.gateway.city}
+                        <span className="ml-2 text-ink-faint">{match.gateway.country}</span>
+                      </span>
+                      <span className="label-sm mt-1.5 block truncate text-ink-ghost">
+                        {match.gateway.name} · {match.gateway.fboQuality}
+                      </span>
+                    </span>
+                    <span className="tabular shrink-0 text-[11px] text-ink-muted">
+                      {match.gateway.code}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="mt-2.5 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={locate}
+              disabled={geo === 'locating'}
+              className="label-sm text-ink-faint transition-colors hover:text-ink disabled:opacity-40"
+            >
+              {geo === 'locating' ? 'Locating' : 'Detect my location'}
+            </button>
+            {geo === 'denied' && (
+              <span className="text-[11px] leading-4 text-ink-faint">
+                Location is off for this site. Type a city instead.
+              </span>
+            )}
+            {geo === 'unavailable' && (
+              <span className="text-[11px] leading-4 text-ink-faint">
+                Your browser would not give us a position.
+              </span>
+            )}
+          </div>
+
+          {detected && (
+            <button
+              type="button"
+              onClick={() => choose(detected.gateway)}
+              className="mt-2 flex w-full items-baseline justify-between gap-3 border border-brass-deep/60 bg-brass-wash px-2.5 py-2 text-left"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-[13px] leading-4 text-brass">
+                  {detected.gateway.city} · {detected.gateway.name}
+                </span>
+                <span className="label-sm mt-1.5 block text-ink-ghost">
+                  {detected.nm} nm from you{geo === 'far' ? ' — the nearest we cover' : ''}
+                </span>
+              </span>
+              <span className="tabular shrink-0 text-[11px] text-brass">
+                {detected.gateway.code}
+              </span>
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

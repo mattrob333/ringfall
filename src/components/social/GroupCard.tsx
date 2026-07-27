@@ -97,16 +97,25 @@ export function GroupCard({ group, defaultOpen = false, className }: GroupCardPr
     return q.costPerSeat;
   }, [group.eventId, group.capacity, group.jet, filled, home.coords]);
 
+  // The host is already named in full underneath; drawing their plate again in
+  // the stack is a duplicate, and the reader notices duplicates.
   const faces = useMemo(
     () =>
       group.members
-        .filter((m) => m.memberId !== meId)
+        .filter((m) => m.memberId !== meId && m.role !== 'host')
         .slice(0, FACE_LIMIT)
         .map((m) => MEMBER_INDEX.get(m.memberId))
         .filter((m): m is NonNullable<typeof m> => m !== undefined),
     [group.members, meId],
   );
-  const overflow = Math.max(0, group.members.length - faces.length - (mine ? 1 : 0));
+  // Everyone drawn or named elsewhere on the card comes off the count. The
+  // host and the viewer can be the same person, so they are counted once.
+  const named = new Set<string>([
+    ...faces.map((m) => m.id),
+    ...(host ? [host.memberId] : []),
+    ...(mine ? [meId] : []),
+  ]);
+  const overflow = Math.max(0, group.members.length - named.size);
 
   const reveal = useCallback(
     (next: TabId) => {
@@ -201,7 +210,16 @@ export function GroupCard({ group, defaultOpen = false, className }: GroupCardPr
 
         {/* ── The people. Faces are the product; they are clickable. ─────── */}
         <div className="flex items-center justify-between gap-4">
-          {host && <MemberBadge memberId={host.memberId} size="sm" />}
+          {host && (
+            <button
+              type="button"
+              onClick={() => openProfile(host.memberId)}
+              className="min-w-0 text-left"
+              aria-label="Open the host's profile"
+            >
+              <MemberBadge memberId={host.memberId} size="sm" />
+            </button>
+          )}
           <div className="flex shrink-0 items-center" role="list" aria-label="On this manifest">
             {faces.map((m, i) => (
               <button
@@ -219,7 +237,7 @@ export function GroupCard({ group, defaultOpen = false, className }: GroupCardPr
                   className="absolute inset-[-1.5px] rounded-full bg-abyss"
                   style={{ zIndex: -1 }}
                 />
-                <Avatar seed={m.avatarSeed} size={22} name={m.name} decorative />
+                <Avatar seed={m.avatarSeed} size={22} name={m.name} photoUrl={m.photoUrl} decorative />
                 {online.has(m.id) && (
                   <span
                     aria-hidden
@@ -326,44 +344,48 @@ export function GroupCard({ group, defaultOpen = false, className }: GroupCardPr
             className="overflow-hidden"
           >
             <div className="border-t border-ink/8 px-3.5 pt-3 pb-3.5">
-              <div
-                role="tablist"
-                aria-label="Cabin detail"
-                aria-orientation="horizontal"
-                className="flex items-center gap-1"
-              >
-                {TABS.map((t, i) => {
-                  const selected = t.id === tab;
-                  return (
-                    <button
-                      key={t.id}
-                      ref={(el) => {
-                        tabRefs.current[i] = el;
-                      }}
-                      type="button"
-                      role="tab"
-                      id={`${bodyId}-tab-${t.id}`}
-                      aria-selected={selected}
-                      aria-controls={`${bodyId}-panel-${t.id}`}
-                      tabIndex={selected ? 0 : -1}
-                      onKeyDown={onTabKeyDown}
-                      onClick={() => setTab(t.id)}
-                      className={cn(
-                        'label h-7 border-b px-2 pb-1 transition-colors',
-                        'duration-[var(--duration-instant)] ease-[var(--ease-glide)]',
-                        selected
-                          ? 'border-brass text-brass-bright'
-                          : 'border-transparent text-ink-faint hover:text-ink',
-                      )}
-                    >
-                      {t.label}
-                      {t.id === 'conversation' && unread > 0 && (
-                        <span className="tabular ml-1.5 text-signal">{formatUnread(unread)}</span>
-                      )}
-                    </button>
-                  );
-                })}
-                <span aria-hidden className="h-px flex-1 bg-ink/8 self-end mb-0" />
+              {/* The rule is a sibling of the tablist, not a child of it —
+                  a `role="tablist"` may only contain tabs. */}
+              <div className="flex items-stretch">
+                <div
+                  role="tablist"
+                  aria-label="Cabin detail"
+                  aria-orientation="horizontal"
+                  className="flex items-center gap-1"
+                >
+                  {TABS.map((t, i) => {
+                    const selected = t.id === tab;
+                    return (
+                      <button
+                        key={t.id}
+                        ref={(el) => {
+                          tabRefs.current[i] = el;
+                        }}
+                        type="button"
+                        role="tab"
+                        id={`${bodyId}-tab-${t.id}`}
+                        aria-selected={selected}
+                        aria-controls={`${bodyId}-panel-${t.id}`}
+                        tabIndex={selected ? 0 : -1}
+                        onKeyDown={onTabKeyDown}
+                        onClick={() => setTab(t.id)}
+                        className={cn(
+                          'label h-7 border-b px-2 pb-1 transition-colors',
+                          'duration-[var(--duration-instant)] ease-[var(--ease-glide)]',
+                          selected
+                            ? 'border-brass text-brass-bright'
+                            : 'border-transparent text-ink-faint hover:text-ink',
+                        )}
+                      >
+                        {t.label}
+                        {t.id === 'conversation' && unread > 0 && (
+                          <span className="tabular ml-1.5 text-signal">{formatUnread(unread)}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span aria-hidden className="mb-px h-px flex-1 self-end bg-ink/8" />
               </div>
 
               <div

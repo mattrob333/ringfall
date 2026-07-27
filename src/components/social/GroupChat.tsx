@@ -139,6 +139,8 @@ export function GroupChat({ groupId, group, maxHeight = 320, className }: GroupC
   const groups = useSocialStore((s) => s.groups);
   const meId = useSocialStore((s) => s.currentMember.id);
   const sendMessage = useSocialStore((s) => s.sendMessage);
+  const myAvatarSeed = useSocialStore((s) => s.currentMember.avatarSeed);
+  const myPhotoUrl = useSocialStore((s) => s.currentMember.photoUrl);
   const markRead = useSocialStore((s) => s.markRead);
   const reduced = useReducedMotion();
   const openProfile = useOpenProfile();
@@ -219,6 +221,7 @@ export function GroupChat({ groupId, group, maxHeight = 320, className }: GroupC
     const sent = sendMessage(groupId, draft);
     if (!sent) return;
     setDraft('');
+    if (box.current) box.current.style.height = 'auto';
     setAtBottom(true);
     requestAnimationFrame(() => toBottom(true));
   }, [draft, groupId, sendMessage, toBottom]);
@@ -265,7 +268,13 @@ export function GroupChat({ groupId, group, maxHeight = 320, className }: GroupC
               ) : b.kind === 'system' ? (
                 <SystemLine key={b.key} message={b.message} />
               ) : (
-                <MessageRun key={b.key} run={b} onOpenProfile={openProfile} />
+                <MessageRun
+                  key={b.key}
+                  run={b}
+                  onOpenProfile={openProfile}
+                  myAvatarSeed={myAvatarSeed}
+                  myPhotoUrl={myPhotoUrl}
+                />
               ),
             )}
           </div>
@@ -311,7 +320,14 @@ export function GroupChat({ groupId, group, maxHeight = 320, className }: GroupC
             ref={box}
             value={draft}
             rows={1}
-            onChange={(e) => setDraft(e.target.value.slice(0, 600))}
+            onChange={(e) => {
+              setDraft(e.target.value.slice(0, 600));
+              // Grow with the content up to the max height, then scroll. Done
+              // imperatively because a textarea has no intrinsic content size.
+              const el = e.currentTarget;
+              el.style.height = 'auto';
+              el.style.height = `${Math.min(el.scrollHeight, 96)}px`;
+            }}
             onKeyDown={onKeyDown}
             placeholder="Wheels up Thursday works. I will come up the night before."
             className={cn(
@@ -369,9 +385,13 @@ function SystemLine({ message }: { message: ChatMessage }) {
 function MessageRun({
   run,
   onOpenProfile,
+  myAvatarSeed,
+  myPhotoUrl,
 }: {
   run: Run;
   onOpenProfile: (memberId: string) => void;
+  myAvatarSeed: string;
+  myPhotoUrl?: string;
 }) {
   const member = MEMBER_INDEX.get(run.memberId);
   const first = run.messages[0]!;
@@ -394,13 +414,14 @@ function MessageRun({
             className="block rounded-full focus-visible:outline-1 focus-visible:outline-brass"
             aria-label={`Open ${member.name}'s profile`}
           >
-            <Avatar seed={member.avatarSeed} size={22} name={member.name} decorative />
+            <Avatar seed={member.avatarSeed} size={22} name={member.name} photoUrl={member.photoUrl} decorative />
           </button>
         ) : (
           <Avatar
-            seed={member?.avatarSeed ?? 'meridian::self'}
+            seed={member?.avatarSeed ?? myAvatarSeed}
             size={22}
             name={name}
+            photoUrl={run.mine ? myPhotoUrl : member?.photoUrl}
             accented={run.mine}
             decorative
           />

@@ -16,11 +16,11 @@
 import { useMemo } from 'react';
 
 import { Button, cn, Rule } from '@/components/ui';
-import { MEMBER_INDEX } from '@/lib/social/members';
+import { MEMBER_INDEX, type MemberDossier } from '@/lib/social/members';
 import { useGroupPresence } from '@/lib/social/presence';
 import { useOpenProfile } from '@/lib/social/profileStore';
 import { useSocialStore } from '@/lib/social/useSocialStore';
-import type { GroupMembership, Member, TravelGroup } from '@/lib/types';
+import type { GroupMembership, TravelGroup } from '@/lib/types';
 import { Avatar } from './Avatar';
 import { MemberTierMark } from './MemberTierMark';
 
@@ -33,7 +33,8 @@ export interface GroupRosterProps {
 
 interface Seat {
   membership: GroupMembership;
-  member: Member;
+  /** The dossier form — carries the photograph when the record has one. */
+  member: MemberDossier;
   isHost: boolean;
   isMe: boolean;
 }
@@ -42,6 +43,8 @@ export function GroupRoster({ groupId, group, className }: GroupRosterProps) {
   const groups = useSocialStore((s) => s.groups);
   const meId = useSocialStore((s) => s.currentMember.id);
   const myName = useSocialStore((s) => s.currentMember.name);
+  const myAvatarSeed = useSocialStore((s) => s.currentMember.avatarSeed);
+  const myPhotoUrl = useSocialStore((s) => s.currentMember.photoUrl);
   const joinGroup = useSocialStore((s) => s.joinGroup);
   const openProfile = useOpenProfile();
 
@@ -99,7 +102,7 @@ export function GroupRoster({ groupId, group, className }: GroupRosterProps) {
           <li>
             {seats.length > 0 && <Rule variant="ghost" />}
             <div className="flex items-center gap-3 py-2.5">
-              <Avatar seed="meridian::self" size={30} name={myName} accented decorative />
+              <Avatar seed={myAvatarSeed} size={30} name={myName} photoUrl={myPhotoUrl} accented decorative />
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="font-display text-[14px] leading-5 text-brass">You</span>
                 <span className="label-sm text-ink-faint">On this manifest</span>
@@ -162,7 +165,14 @@ function SeatRow({
       aria-label={`Open ${member.name}'s profile`}
     >
       <span className="relative shrink-0">
-        <Avatar seed={member.avatarSeed} size={30} name={member.name} accented={isHost} decorative />
+        <Avatar
+          seed={member.avatarSeed}
+          size={30}
+          name={member.name}
+          photoUrl={member.photoUrl}
+          accented={isHost}
+          decorative
+        />
         {/* Presence sits on the plate itself, cut out of the surface behind it,
             so it reads as part of the portrait rather than a badge on top. */}
         <span

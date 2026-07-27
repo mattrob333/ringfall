@@ -89,6 +89,22 @@ const USER_GROUP_PREFIX = 'usr-';
 /** More than this and the suggestion list stops being a shortcut. */
 const MAX_CONTACTS = 40;
 
+/**
+ * Read marks are kept per notification id. Bounded, because the drip runs for
+ * as long as the tab is open and the feed itself only ever shows two dozen.
+ */
+const MAX_READ_MARKS = 300;
+
+/**
+ * Invitations a member may extend to people who are not in the club, per year.
+ *
+ * Three. This is the product: you are not signed up, you are vouched in, and
+ * the person who vouches for you spends something they cannot get back until
+ * next year. An unlimited invite button would make the register worthless
+ * inside a season.
+ */
+export const INVITE_ALLOWANCE = 3;
+
 const isUserGroup = (g: TravelGroup): boolean => g.id.startsWith(USER_GROUP_PREFIX);
 
 const clampInt = (v: number, lo: number, hi: number): number =>
@@ -137,6 +153,15 @@ interface SocialState {
    * about who they have already approached, and the UI describes it that way.
    */
   asks: MemberAsk[];
+  /** Ids of activity notifications the member has already seen. */
+  readActivityIds: string[];
+  /**
+   * Invitations left to extend to people outside the club this year. Asking an
+   * existing member onto a cabin is free; bringing somebody new in is not.
+   */
+  invitesRemaining: number;
+  /** The year `invitesRemaining` was last replenished for. */
+  invitesYear: number;
 
   // ── Mutations ─────────────────────────────────────────────────────────
   setInterest: (eventId: string, level: InterestLevel, note?: string) => void;
@@ -163,6 +188,14 @@ interface SocialState {
   forgetContact: (email: string) => void;
   /** Note that the user asked specific members onto a trip. Local record only. */
   noteAsks: (memberIds: readonly string[], eventId: string, groupId?: string) => void;
+  /** Mark specific notifications read. */
+  markActivityRead: (ids: readonly string[]) => void;
+  /**
+   * Spend invitations on people outside the club. Returns how many were
+   * actually spent — never more than remain, so the caller can tell the member
+   * the truth rather than silently sending fewer.
+   */
+  spendInvites: (count: number) => number;
   revealNextPeer: () => void;
   reset: () => void;
 
@@ -217,6 +250,9 @@ interface PersistedV3 extends PersistedV2 {
 interface PersistedV4 extends PersistedV3 {
   contacts: SavedContact[];
   asks: MemberAsk[];
+  readActivityIds: string[];
+  invitesRemaining: number;
+  invitesYear: number;
 }
 
 /** What actually goes to disk. */
@@ -250,6 +286,21 @@ function sanitizeContacts(raw: unknown): SavedContact[] {
     });
   }
   return out.slice(0, MAX_CONTACTS);
+}
+
+/**
+ * The allowance as of right now. Called only from `merge`, which runs inside
+ * the rehydration effect — never during a server render.
+ */
+function resolveAllowance(
+  remaining: unknown,
+  year: unknown,
+): { invitesRemaining: number; invitesYear: number } {
+  const now = new Date().getUTCFullYear();
+  if (typeof remaining !== 'number' || year !== now) {
+    return { invitesRemaining: INVITE_ALLOWANCE, invitesYear: now };
+  }
+  return { invitesRemaining: clampInt(remaining, 0, INVITE_ALLOWANCE), invitesYear: now };
 }
 
 function sanitizeAsks(raw: unknown): MemberAsk[] {
@@ -375,6 +426,11 @@ export const useSocialStore = create<SocialState>()(
       lastReadAt: {},
       contacts: [],
       asks: [],
+      readActivityIds: [],
+      invitesRemaining: INVITE_ALLOWANCE,
+      // Seeded from the initial state, replaced on rehydrate. Never read during
+      // a server render, so the wall clock here cannot cause a mismatch.
+      invitesYear: 0,
 
       // ── Interest ────────────────────────────────────────────────────────
       setInterest: (eventId, level, note) =>
@@ -543,6 +599,36 @@ export const useSocialStore = create<SocialState>()(
           return added.length ? { asks: [...s.asks, ...added] } : {};
         }),
 
+      markActivityRead: (ids) =>
+        set((s) => {
+          if (ids.length === 0) return {};
+          const next = new Set(s.readActivityIds);
+          let changed = false;
+          for (const id of ids) {
+            if (!next.has(id)) {
+              next.add(id);
+              changed = true;
+            }
+          }
+          if (!changed) return {};
+          // Newest marks are the ones worth keeping when we trim.
+          return { readActivityIds: [...next].slice(-MAX_READ_MARKS) };
+        }),
+
+      spendInvites: (count) => {
+        const wanted = Math.max(0, Math.floor(count));
+        if (wanted === 0) return 0;
+        const year = new Date().getUTCFullYear();
+        const s = get();
+        // The allowance replenishes on the calendar year, checked lazily —
+        // there is no server to run a job, so the first spend of a new year
+        // is what notices.
+        const available = s.invitesYear === year ? s.invitesRemaining : INVITE_ALLOWANCE;
+        const spent = Math.min(wanted, available);
+        set({ invitesRemaining: available - spent, invitesYear: year });
+        return spent;
+      },
+
       revealNextPeer: () =>
         set((s) => ({
           dripRevealed: Math.min(s.dripRevealed + 1, getSimulation().dripQueue.length),
@@ -558,6 +644,9 @@ export const useSocialStore = create<SocialState>()(
           lastReadAt: {},
           contacts: [],
           asks: [],
+          readActivityIds: [],
+          invitesRemaining: INVITE_ALLOWANCE,
+          invitesYear: new Date().getUTCFullYear(),
         }),
 
       // ── Conversation ────────────────────────────────────────────────────
@@ -713,6 +802,9 @@ export const useSocialStore = create<SocialState>()(
         lastReadAt: s.lastReadAt,
         contacts: s.contacts,
         asks: s.asks,
+        readActivityIds: s.readActivityIds,
+        invitesRemaining: s.invitesRemaining,
+        invitesYear: s.invitesYear,
       }),
 
       /**
@@ -757,6 +849,17 @@ export const useSocialStore = create<SocialState>()(
           // member keeps their photograph, which lives inside `currentMember`.
           contacts: version < 4 ? [] : sanitizeContacts(p.contacts),
           asks: version < 4 ? [] : sanitizeAsks(p.asks),
+          readActivityIds:
+            version < 4 || !Array.isArray(p.readActivityIds)
+              ? []
+              : p.readActivityIds.filter((id): id is string => typeof id === 'string'),
+          // A pre-v4 member has spent nothing, so they arrive with the full
+          // allowance rather than being penalised by the upgrade.
+          invitesRemaining:
+            version < 4 || typeof p.invitesRemaining !== 'number'
+              ? INVITE_ALLOWANCE
+              : clampInt(p.invitesRemaining, 0, INVITE_ALLOWANCE),
+          invitesYear: typeof p.invitesYear === 'number' ? p.invitesYear : 0,
         };
       },
 
@@ -776,6 +879,12 @@ export const useSocialStore = create<SocialState>()(
           lastReadAt: sanitizeReads(p.lastReadAt),
           contacts: sanitizeContacts(p.contacts),
           asks: sanitizeAsks(p.asks),
+          readActivityIds: Array.isArray(p.readActivityIds)
+            ? p.readActivityIds.filter((id): id is string => typeof id === 'string')
+            : [],
+          // A stored allowance from a previous calendar year is stale: the
+          // member gets their three back, and `spendInvites` re-stamps the year.
+          ...resolveAllowance(p.invitesRemaining, p.invitesYear),
         };
       },
 

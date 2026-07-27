@@ -21,7 +21,9 @@
  * unintended — none of these are keyed to real individuals.
  */
 
-import type { EventCategory, Member, MemberTier } from '@/lib/types';
+import { AIRPORTS } from '@/lib/data/events/airports';
+import { greatCircleDistanceNm } from '@/lib/geo/projection';
+import type { Airport, EventCategory, GeoPoint, Member, MemberTier } from '@/lib/types';
 import { hashSeed, mulberry32 } from './rng';
 
 /**
@@ -997,30 +999,304 @@ export const YOU: MemberDossier = {
   bio: '',
   interests: ['art', 'motorsport', 'culinary'],
   openToJetShare: true,
+  // You did not sign up. Somebody put their name to you, and the register says
+  // whose — the same rule as everybody else on it.
+  verifiedBy: '@lthornebaptiste',
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Gateways
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * Home bases offered in the profile sheet. A short, opinionated list — the
- * fields members actually keep aircraft on, not an airport database.
+ * Where a member keeps the aircraft.
+ *
+ * A scrolling list of airports was the wrong shape for this question: nobody
+ * wants to hunt for their own city in an index. The answer is a name — "Miami",
+ * "Teterboro", "KTEB", "Côte d'Azur" — resolved to the field a private aircraft
+ * would actually use.
+ *
+ * Coordinates, names and FBO quality come from the shared registry in
+ * `lib/data/events/airports.ts`, which is real data. The city, country and the
+ * search aliases are curated here, because the registry is a list of runways
+ * and a member's home base is a place.
  */
-export const HOME_BASE_OPTIONS: readonly Member['homeBase'][] = [
-  { city: 'New York', country: 'United States', coords: { lat: 40.7128, lon: -74.006 }, homeJetPort: 'KTEB' },
-  { city: 'Los Angeles', country: 'United States', coords: { lat: 34.0522, lon: -118.2437 }, homeJetPort: 'KVNY' },
-  { city: 'Miami', country: 'United States', coords: { lat: 25.7617, lon: -80.1918 }, homeJetPort: 'KOPF' },
-  { city: 'Aspen', country: 'United States', coords: { lat: 39.1911, lon: -106.8175 }, homeJetPort: 'KASE' },
-  { city: 'London', country: 'United Kingdom', coords: { lat: 51.5074, lon: -0.1278 }, homeJetPort: 'EGLF' },
-  { city: 'Paris', country: 'France', coords: { lat: 48.8566, lon: 2.3522 }, homeJetPort: 'LFPB' },
-  { city: 'Geneva', country: 'Switzerland', coords: { lat: 46.2044, lon: 6.1432 }, homeJetPort: 'LSGG' },
-  { city: 'St. Moritz', country: 'Switzerland', coords: { lat: 46.4908, lon: 9.8355 }, homeJetPort: 'LSZS' },
-  { city: 'Monaco', country: 'Monaco', coords: { lat: 43.7384, lon: 7.4246 }, homeJetPort: 'LFMN' },
-  { city: 'Milan', country: 'Italy', coords: { lat: 45.4642, lon: 9.19 }, homeJetPort: 'LIML' },
-  { city: 'Ibiza', country: 'Spain', coords: { lat: 38.9067, lon: 1.4206 }, homeJetPort: 'LEIB' },
-  { city: 'Dubai', country: 'United Arab Emirates', coords: { lat: 25.2048, lon: 55.2708 }, homeJetPort: 'OMDW' },
-  { city: 'Mumbai', country: 'India', coords: { lat: 19.076, lon: 72.8777 }, homeJetPort: 'VABB' },
-  { city: 'Singapore', country: 'Singapore', coords: { lat: 1.3521, lon: 103.8198 }, homeJetPort: 'WSSL' },
-  { city: 'Hong Kong', country: 'Hong Kong SAR', coords: { lat: 22.3193, lon: 114.1694 }, homeJetPort: 'VHHH' },
-  { city: 'Tokyo', country: 'Japan', coords: { lat: 35.6762, lon: 139.6503 }, homeJetPort: 'RJTT' },
-  { city: 'São Paulo', country: 'Brazil', coords: { lat: -23.5505, lon: -46.6333 }, homeJetPort: 'SBSP' },
-  { city: 'Cape Town', country: 'South Africa', coords: { lat: -33.9249, lon: 18.4241 }, homeJetPort: 'FACT' },
-  { city: 'Sydney', country: 'Australia', coords: { lat: -33.8688, lon: 151.2093 }, homeJetPort: 'YSSY' },
-];
+export interface Gateway {
+  /** ICAO. */
+  code: string;
+  /** The field's own name, e.g. "Paris–Le Bourget". */
+  name: string;
+  city: string;
+  country: string;
+  coords: GeoPoint;
+  fboQuality: Airport['fboQuality'];
+  /** Everything this field can be found by, lowercased. */
+  aliases: readonly string[];
+}
+
+/** `ICAO: 'City|Country|alias,alias'` — aliases beyond the city and the name. */
+const GATEWAY_PLACES: Readonly<Record<string, string>> = {
+  // Europe
+  LFPB: 'Paris|France|le bourget,lbg,ile-de-france',
+  LFMN: 'Nice|France|cote d azur,côte d’azur,french riviera,monaco,nce,antibes',
+  LFMD: 'Cannes|France|croisette,mandelieu,french riviera,cеq',
+  LFTZ: 'Saint-Tropez|France|la mole,ramatuelle,pampelonne',
+  LFLB: 'Courchevel|France|chambery,savoie,three valleys,meribel,val d isere',
+  LSGG: 'Geneva|Switzerland|genève,gva,lake geneva,verbier,chamonix',
+  LSZH: 'Zurich|Switzerland|zrh,zürich',
+  LSZS: 'St. Moritz|Switzerland|samedan,engadin,engadine,st moritz,saint moritz',
+  LSGK: 'Gstaad|Switzerland|saanen,bernese oberland',
+  LSZA: 'Lugano|Switzerland|ticino,lake como south',
+  LOWW: 'Vienna|Austria|wien,schwechat,vie',
+  LOWI: 'Innsbruck|Austria|tyrol,tirol,kitzbuhel,kitzbühel,st anton',
+  EDMO: 'Munich|Germany|münchen,oberpfaffenhofen,bavaria,bayern',
+  EDDB: 'Berlin|Germany|brandenburg,ber',
+  EGLF: 'London|United Kingdom|farnborough,fab,surrey,south west london',
+  EGGW: 'Luton|United Kingdom|london luton,ltn,hertfordshire',
+  EGKB: 'Biggin Hill|United Kingdom|london biggin hill,bqh,kent',
+  EIDW: 'Dublin|Ireland|leinster,kildare,dub',
+  LIML: 'Milan|Italy|milano,linate,lombardy,lin,como',
+  LIRA: 'Rome|Italy|roma,ciampino,lazio',
+  LIPZ: 'Venice|Italy|venezia,veneto,marco polo,vce',
+  LIQS: 'Siena|Italy|tuscany,toscana,chianti,val d orcia',
+  LIEO: 'Porto Cervo|Italy|olbia,costa smeralda,sardinia,sardegna,obl',
+  LEIB: 'Ibiza|Spain|eivissa,formentera,balearics,ibz',
+  LEPA: 'Palma|Spain|mallorca,majorca,balearics,pmi',
+  LECU: 'Madrid|Spain|cuatro vientos,castile',
+  LEMG: 'Marbella|Spain|malaga,málaga,costa del sol,sotogrande,agp',
+  LPCS: 'Lisbon|Portugal|lisboa,cascais,comporta,estoril',
+  LGAV: 'Athens|Greece|athina,attica,ath',
+  LGMK: 'Mykonos|Greece|cyclades,jmk,paros',
+  LTBA: 'Istanbul|Türkiye|turkey,bosphorus,ataturk,atatürk',
+  EHRD: 'Rotterdam|Netherlands|amsterdam,the hague,den haag,randstad',
+  EBBR: 'Brussels|Belgium|bruxelles,brussel,bru',
+  EKCH: 'Copenhagen|Denmark|kobenhavn,københavn,kastrup,cph',
+  ESSB: 'Stockholm|Sweden|bromma,archipelago,bma',
+  ENBR: 'Bergen|Norway|fjords,hordaland,bgo',
+  BIRK: 'Reykjavík|Iceland|reykjavik,rkv,iceland',
+  LKPR: 'Prague|Czechia|praha,prg,bohemia',
+  // Gulf, Levant, Africa
+  OMDW: 'Dubai|United Arab Emirates|al maktoum,dwc,jebel ali',
+  OMAD: 'Abu Dhabi|United Arab Emirates|al bateen,azi,yas',
+  OTHH: 'Doha|Qatar|hamad,doh,qatar',
+  OEJN: 'Jeddah|Saudi Arabia|red sea,alula,jed',
+  OERK: 'Riyadh|Saudi Arabia|diriyah,ruh',
+  OOMS: 'Muscat|Oman|mct,oman',
+  GMMX: 'Marrakech|Morocco|marrakesh,menara,rak,atlas',
+  HKNW: 'Nairobi|Kenya|wilson,laikipia,maasai mara,masai mara',
+  HTKJ: 'Kilimanjaro|Tanzania|arusha,serengeti,ngorongoro,jro',
+  HRYR: 'Kigali|Rwanda|nyungwe,volcanoes,kgl',
+  FALA: 'Johannesburg|South Africa|lanseria,hla,sandton,gauteng',
+  FACT: 'Cape Town|South Africa|western cape,stellenbosch,franschhoek,cpt',
+  FSIA: 'Mahé|Seychelles|seychelles,mahe,praslin,sez',
+  FIMP: 'Port Louis|Mauritius|mauritius,mru',
+  // Asia-Pacific
+  RJTT: 'Tokyo|Japan|haneda,hnd,kanto',
+  RJOO: 'Kyoto|Japan|osaka,itami,kansai,itm',
+  RKSS: 'Seoul|South Korea|gimpo,kimpo,gmp',
+  VHHH: 'Hong Kong|Hong Kong SAR|hkg,kowloon',
+  ZSPD: 'Shanghai|China|pudong,pvg,jiangnan',
+  WSSL: 'Singapore|Singapore|seletar,xsp',
+  VTBD: 'Bangkok|Thailand|don mueang,dmk,krung thep',
+  VIDP: 'Delhi|India|new delhi,ncr,gurgaon,del',
+  VABB: 'Mumbai|India|bombay,juhu,bom',
+  VOCI: 'Kochi|India|kerala,cochin,cok',
+  VCBI: 'Colombo|Sri Lanka|ceylon,galle,cmb',
+  VRMM: 'Malé|Maldives|maldives,male,mle,baa atoll',
+  WADD: 'Bali|Indonesia|denpasar,ngurah rai,dps,jakarta',
+  // The Americas
+  KTEB: 'New York|United States|teterboro,teb,nyc,manhattan,hamptons',
+  KHPN: 'Westchester|United States|white plains,hpn,greenwich,connecticut',
+  KVNY: 'Los Angeles|United States|van nuys,vny,la,malibu,beverly hills',
+  KOPF: 'Miami|United States|opa locka,opf,south beach,coconut grove',
+  KPBI: 'Palm Beach|United States|west palm,pbi,jupiter,wellington',
+  KASE: 'Aspen|United States|pitkin,ase,snowmass,roaring fork',
+  KEGE: 'Vail|United States|eagle county,ege,beaver creek',
+  KJAC: 'Jackson|United States|jackson hole,jac,teton,wyoming',
+  KACK: 'Nantucket|United States|ack,cape cod,marthas vineyard',
+  KSAF: 'Santa Fe|United States|saf,new mexico,taos',
+  KADS: 'Dallas|United States|addison,ads,texas',
+  KHOU: 'Houston|United States|hobby,hou,texas',
+  KSLC: 'Park City|United States|salt lake,slc,deer valley,utah',
+  KMRY: 'Monterey|United States|carmel,pebble beach,big sur,mry',
+  KPSP: 'Palm Springs|United States|psp,coachella,la quinta',
+  CYTZ: 'Toronto|Canada|billy bishop,ytz,ontario',
+  CYVR: 'Vancouver|Canada|yvr,whistler,british columbia',
+  MMTO: 'Mexico City|Mexico|toluca,cdmx,tlc',
+  MMSD: 'Los Cabos|Mexico|cabo,san jose del cabo,sjd,baja',
+  MMUN: 'Cancún|Mexico|cancun,tulum,riviera maya,cun',
+  MYNN: 'Nassau|Bahamas|bahamas,nas,harbour island',
+  TFFJ: 'St Barthélemy|France|st barths,saint barth,sbh,gustavia',
+  SBSP: 'São Paulo|Brazil|sao paulo,congonhas,cgh',
+  SBJR: 'Rio de Janeiro|Brazil|rio,jacarepagua,ipanema',
+  SADP: 'Buenos Aires|Argentina|san fernando,palermo,pampas',
+  SAME: 'Mendoza|Argentina|uco valley,andes',
+  SCEL: 'Santiago|Chile|scl,patagonia,chile',
+  SPJC: 'Lima|Peru|lim,barranco,cusco',
+  // Oceania
+  YSSY: 'Sydney|Australia|syd,new south wales,bondi',
+  YMEN: 'Melbourne|Australia|essendon,meb,victoria,mornington',
+  NZQN: 'Queenstown|New Zealand|zqn,wanaka,southern lakes,otago',
+};
+
+/** Every gateway a member can be based at, in registry order. */
+export const GATEWAYS: readonly Gateway[] = AIRPORTS.filter(
+  (a) => GATEWAY_PLACES[a.code] !== undefined,
+).map((a) => {
+  const [city = a.name, country = '', aliasList = ''] = (GATEWAY_PLACES[a.code] ?? '').split('|');
+  const aliases = [
+    city.toLowerCase(),
+    country.toLowerCase(),
+    a.name.toLowerCase(),
+    a.code.toLowerCase(),
+    ...aliasList.split(',').map((s) => s.trim().toLowerCase()),
+  ].filter((s) => s.length > 0);
+  return {
+    code: a.code,
+    name: a.name,
+    city,
+    country,
+    coords: a.coords,
+    fboQuality: a.fboQuality,
+    aliases: [...new Set(aliases)],
+  };
+});
+
+export const GATEWAY_INDEX: ReadonlyMap<string, Gateway> = new Map(
+  GATEWAYS.map((g) => [g.code, g]),
+);
+
+const FBO_RANK: Record<Airport['fboQuality'], number> = {
+  exceptional: 2,
+  excellent: 1,
+  adequate: 0,
+};
+
+export interface GatewayMatch {
+  gateway: Gateway;
+  /** Higher is better. Only meaningful relative to the other matches. */
+  score: number;
+  /** Which alias matched, so the UI can show *why* this is the answer. */
+  matched: string;
+}
+
+/**
+ * Fuzzy gateway search.
+ *
+ * Ranked rather than filtered, because the useful answer to "miami" is
+ * Opa-locka and the useful answer to "kteb" is Teterboro, and a naive substring
+ * filter gets neither. Scoring, in order of confidence: the exact ICAO, a
+ * prefix of an alias, a word inside an alias, then a loose subsequence for
+ * typos. Ties break toward the better-served field — if two gateways are
+ * equally plausible you want the one with three FBOs and no slot problem.
+ */
+export function searchGateways(query: string, limit = 5): GatewayMatch[] {
+  const q = normalize(query);
+  if (q.length === 0) return [];
+
+  const out: GatewayMatch[] = [];
+  for (const gateway of GATEWAYS) {
+    let best = 0;
+    let matched = '';
+    for (const alias of gateway.aliases) {
+      const a = normalize(alias);
+      if (!a) continue;
+      let s = 0;
+      if (a === q) s = 100;
+      else if (a.startsWith(q)) s = 82 - Math.min(20, a.length - q.length);
+      else if (wordStarts(a, q)) s = 70;
+      else if (a.includes(q)) s = 52;
+      // Typo tolerance, but only when the first letter agrees — otherwise
+      // "miami" quietly matches "roMe cIAMpIno" and the list fills with noise.
+      else if (q.length >= 4 && startsSameLetter(a, q) && isSubsequence(q, a)) s = 26;
+      if (s > best) {
+        best = s;
+        matched = alias;
+      }
+    }
+    if (best > 0) out.push({ gateway, score: best + FBO_RANK[gateway.fboQuality], matched });
+  }
+
+  return out
+    .sort((a, b) => b.score - a.score || a.gateway.city.localeCompare(b.gateway.city))
+    .slice(0, limit);
+}
+
+/** Nearest gateway to a point, great-circle. What geolocation resolves through. */
+export function nearestGateway(coords: GeoPoint): Gateway {
+  let best = GATEWAYS[0]!;
+  let bestD = Number.POSITIVE_INFINITY;
+  for (const g of GATEWAYS) {
+    const d = greatCircleDistanceNm(coords, g.coords);
+    if (d < bestD) {
+      bestD = d;
+      best = g;
+    }
+  }
+  return best;
+}
+
+/** Distance from a point to a gateway, in nautical miles. */
+export const distanceToGateway = (coords: GeoPoint, gateway: Gateway): number =>
+  Math.round(greatCircleDistanceNm(coords, gateway.coords));
+
+/** A gateway as a member's home base. Coordinates are the field's, not the city's. */
+export const toHomeBase = (gateway: Gateway): Member['homeBase'] => ({
+  city: gateway.city,
+  country: gateway.country,
+  coords: gateway.coords,
+  homeJetPort: gateway.code,
+});
+
+/** Resolve whatever a member has stored back to a gateway record, if we know it. */
+export const gatewayFor = (homeJetPort: string): Gateway | undefined =>
+  GATEWAY_INDEX.get(homeJetPort.toUpperCase());
+
+/** Strip accents and punctuation so "Côte d’Azur" and "cote dazur" both land. */
+function normalize(v: string): string {
+  return v
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** True when `q` starts any word of `a` — "hole" matches "jackson hole". */
+function wordStarts(a: string, q: string): boolean {
+  return a.split(' ').some((word) => word.startsWith(q));
+}
+
+/** Any word of `a` begins with the first character of `q`. */
+function startsSameLetter(a: string, q: string): boolean {
+  const first = q[0];
+  return first !== undefined && a.split(' ').some((word) => word.startsWith(first));
+}
+
+/** Loose typo tolerance: every character of `q` appears in `a`, in order. */
+function isSubsequence(q: string, a: string): boolean {
+  let i = 0;
+  for (const ch of a) {
+    if (ch === q[i]) i++;
+    if (i === q.length) return true;
+  }
+  return false;
+}
+
+/**
+ * The shortlist offered before anyone types — the fields the membership
+ * actually keeps aircraft on. Search reaches the rest.
+ */
+const SHORTLIST = [
+  'KTEB', 'KVNY', 'KOPF', 'KASE', 'EGLF', 'LFPB', 'LSGG', 'LSZS', 'LFMN',
+  'LIML', 'LEIB', 'OMDW', 'VABB', 'WSSL', 'VHHH', 'RJTT', 'SBSP', 'FACT', 'YSSY',
+] as const;
+
+/**
+ * Home bases offered without a query. Kept as `Member['homeBase']` because that
+ * is what the store stores; `GATEWAYS` is the richer form.
+ */
+export const HOME_BASE_OPTIONS: readonly Member['homeBase'][] = SHORTLIST.map((code) =>
+  toHomeBase(GATEWAY_INDEX.get(code)!),
+);

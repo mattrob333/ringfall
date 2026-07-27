@@ -25,6 +25,8 @@ export function GroupList({ eventId, className }: GroupListProps) {
   const groups = useGroupsFor(eventId);
   const createGroup = useSocialStore((s) => s.createGroup);
   const [composing, setComposing] = useState(false);
+  /** The cabin the user just opened, so its card starts expanded. */
+  const [justCreated, setJustCreated] = useState<string | null>(null);
 
   const ordered = useMemo(
     () =>
@@ -59,14 +61,21 @@ export function GroupList({ eventId, className }: GroupListProps) {
       )}
 
       {ordered.map((group) => (
-        <GroupCard key={group.id} group={group} />
+        <GroupCard
+          key={group.id}
+          group={group}
+          defaultOpen={group.id === justCreated}
+        />
       ))}
 
       {composing ? (
         <Composer
           onCancel={() => setComposing(false)}
           onSubmit={(premise, capacity) => {
-            createGroup(eventId, premise, capacity);
+            const created = createGroup(eventId, premise, capacity);
+            // Open the cabin you just opened. There is nobody in it yet, and
+            // the empty thread is the prompt to say something.
+            if (created) setJustCreated(created.id);
             setComposing(false);
           }}
         />

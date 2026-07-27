@@ -2,6 +2,7 @@
 
 import { cn, Tooltip } from '@/components/ui';
 import { MEMBER_INDEX } from '@/lib/social/members';
+import { useOpenProfile } from '@/lib/social/profileStore';
 import { Avatar } from './Avatar';
 import { MemberTierMark } from './MemberTierMark';
 
@@ -11,6 +12,13 @@ export interface MemberBadgeProps {
   /** Drop the name and handle — just the plate, with the identity on hover. */
   compact?: boolean;
   className?: string;
+  /**
+   * Open the member's record on click. Off by default, because this badge is
+   * routinely rendered inside rows that are themselves clickable and a button
+   * inside a button is invalid markup. Turn it on wherever the badge is the
+   * only interactive thing in its row.
+   */
+  interactive?: boolean;
 }
 
 const AVATAR_PX = { sm: 22, md: 32 } as const;
@@ -53,11 +61,14 @@ export function MemberBadge({
   size = 'sm',
   compact = false,
   className,
+  interactive = false,
 }: MemberBadgeProps) {
+  const openProfile = useOpenProfile();
   const member = MEMBER_INDEX.get(memberId);
   if (!member) return null;
 
   const px = AVATAR_PX[size];
+  const photo = member.photoUrl ? { photoUrl: member.photoUrl } : {};
 
   if (compact) {
     return (
@@ -71,14 +82,42 @@ export function MemberBadge({
           </span>
         }
       >
-        <Avatar seed={member.avatarSeed} size={px} name={member.name} className={className} />
+        {interactive ? (
+          <button
+            type="button"
+            onClick={() => openProfile(member.id)}
+            aria-label={`${member.name} — member record`}
+            className={cn('block rounded-full', className)}
+          >
+            <Avatar seed={member.avatarSeed} size={px} name={member.name} {...photo} decorative />
+          </button>
+        ) : (
+          <Avatar
+            seed={member.avatarSeed}
+            size={px}
+            name={member.name}
+            {...photo}
+            className={className}
+          />
+        )}
       </Tooltip>
     );
   }
 
+  const Root = interactive ? 'button' : 'span';
+
   return (
-    <span className={cn('flex min-w-0 items-center gap-2.5', className)}>
-      <Avatar seed={member.avatarSeed} size={px} name={member.name} decorative />
+    <Root
+      {...(interactive
+        ? {
+            type: 'button' as const,
+            onClick: () => openProfile(member.id),
+            'aria-label': `${member.name} — member record`,
+          }
+        : {})}
+      className={cn('flex min-w-0 items-center gap-2.5 text-left', className)}
+    >
+      <Avatar seed={member.avatarSeed} size={px} name={member.name} {...photo} decorative />
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="flex min-w-0 items-center gap-1.5">
           <span
@@ -97,6 +136,6 @@ export function MemberBadge({
           {member.aircraft ? ` · ${member.aircraft}` : ''}
         </span>
       </span>
-    </span>
+    </Root>
   );
 }
