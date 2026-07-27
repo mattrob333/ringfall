@@ -132,6 +132,7 @@ export const EQUESTRIAN_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4000, max: 16000, currency: 'USD' },
     accessNote:
       'Owners’ and Panoramique enclosure access comes via France Galop or your bloodstock agent; the Longchamp private boxes are contracted for the full season rather than the weekend, so the practical route is a hospitality package sold from July',
+    bookingLeadDays: 90,
     venues: [
       'ParisLongchamp',
       'Panoramique enclosure',
@@ -175,6 +176,7 @@ export const EQUESTRIAN_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5000, max: 20000, currency: 'USD' },
     accessNote:
       'Meydan’s private suites and the trackside Silks packages are sold by the Dubai Racing Club from January and the ruling family’s enclosure is invitation-only; general Apron Views tickets are cheap, and the dress code is enforced at the turnstile',
+    bookingLeadDays: 90,
     venues: [
       'Meydan Racecourse',
       'The Meydan Grandstand suites',
@@ -305,6 +307,7 @@ export const EQUESTRIAN_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5000, max: 18000, currency: 'USD' },
     accessNote:
       'The Jockey Club of Saudi Arabia issues owners’ and pavilion badges by invitation, generally through a bloodstock agent or a runner in the meeting; grandstand admission is free but capacity-limited and released in January, and the surrounding programme is the actual draw',
+    bookingLeadDays: 60,
     venues: [
       'King Abdulaziz Racecourse',
       'The Saudi Cup pavilion',
@@ -348,6 +351,7 @@ export const EQUESTRIAN_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3000, max: 11000, currency: 'USD' },
     accessNote:
       'The JRA allocates Fuji View and members’ stand seats by lottery about a month out and they are heavily oversubscribed; the owners’ room needs a JRA-registered owner’s introduction, so a Tokyo racing fixer is the practical route in',
+    bookingLeadDays: 45,
     venues: [
       'Tokyo Racecourse, Fuchu',
       'Fuji View Stand',
@@ -391,6 +395,7 @@ export const EQUESTRIAN_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 2500, max: 9000, currency: 'USD' },
     accessNote:
       'Killanin Suite and Corrib restaurant boxes are taken by Irish trainers and their owners by spring; the constraint is beds, not badges — Glenlo Abbey and Ashford Castle are booked a year out for Plate and Hurdle nights',
+    bookingLeadDays: 365,
     venues: [
       'Ballybrit Racecourse',
       'Killanin Suite',
@@ -525,6 +530,7 @@ export const EQUESTRIAN_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 22000, currency: 'USD' },
     accessNote:
       'The public grandstand on the lake is free. The patron and sponsor tents — the ones with the lunch, the heating and the players afterwards — are contracted by the four team sponsors and issued as named lists in November',
+    bookingLeadDays: 240,
     venues: [
       'Frozen Lake St. Moritz',
       'Patron and sponsor tents',
@@ -572,6 +578,7 @@ export const EQUESTRIAN_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3000, max: 12000, currency: 'USD' },
     accessNote:
       'Deutsche Bank Stadium hospitality and the tower boxes open with the autumn ticket release and the Rolex Grand Prix Sunday clears first; stable-side and warm-up access needs a rider or team pass, which comes from a national federation rather than the organisers',
+    bookingLeadDays: 270,
     venues: [
       'Aachen Soers showgrounds',
       'Deutsche Bank Stadium',
