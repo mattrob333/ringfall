@@ -49,3 +49,33 @@ export type { AvatarSpec } from './avatar';
 
 export { makeRng, hashSeed } from './rng';
 export type { Rng } from './rng';
+
+// ── Conversation ────────────────────────────────────────────────────────────
+export {
+  buildThread,
+  countUnread,
+  formatUnread,
+  getThread,
+  getThreads,
+  mergeThread,
+  nextSentAt,
+  readWatermark,
+  resetThreads,
+  CHAT_SEED,
+} from './chat';
+export type { ChatMessage, ChatMessageKind } from './chat';
+
+// ── Presence ────────────────────────────────────────────────────────────────
+export {
+  getPresenceTick,
+  isOnline,
+  isPresencePaused,
+  resetPresence,
+  setPresencePaused,
+  subscribePresence,
+  typingIn,
+  useGroupPresence,
+  useIsOnline,
+  usePresenceTick,
+} from './presence';
+export type { GroupPresence } from './presence';

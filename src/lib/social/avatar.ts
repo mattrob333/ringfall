@@ -114,6 +114,38 @@ const round = (n: number): number => Math.round(n * 10) / 10;
 /** Just the accent colour — for peer rings and presence dots. */
 export const avatarAccent = (seed: string): string => avatarSpec(seed).accent;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Real photographs
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The minimum a face needs to draw itself. `photoUrl` is optional and usually
+ * absent — the roster ships no photography — but the moment a record has one,
+ * every surface that goes through here shows it instead of the plate.
+ */
+export interface AvatarSource {
+  avatarSeed: string;
+  name: string;
+  /** A real photograph: `data:` URI, absolute https URL, or app-root path. */
+  photoUrl?: string;
+}
+
+/** True for anything we are willing to hand to an `<img src>`. */
+export const isPhotoUrl = (url: string | undefined): url is string =>
+  Boolean(url) && /^(data:image\/|https:\/\/|\/)/.test(url!);
+
+/**
+ * A single `src` for a member: their photograph if they have one, the generated
+ * plate otherwise. For `background-image`, canvas textures and anywhere else a
+ * component tree is not available — React should use `<MemberPortrait />`,
+ * which cross-fades the photo over the plate and survives a broken URL.
+ */
+export function avatarSrc(member: AvatarSource, size: number): string {
+  return isPhotoUrl(member.photoUrl)
+    ? member.photoUrl
+    : avatarDataUri(member.avatarSeed, size, member.name);
+}
+
 /**
  * Standalone SVG markup. The React component in `components/social/Avatar.tsx`
  * draws the same thing in JSX; this string form exists for anywhere a DOM tree

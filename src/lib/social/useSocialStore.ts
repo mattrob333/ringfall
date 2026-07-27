@@ -32,7 +32,14 @@ import type {
   Member,
   TravelGroup,
 } from '@/lib/types';
-import { MEMBER_INDEX, YOU } from './members';
+import {
+  countUnread,
+  mergeThread,
+  nextSentAt,
+  readWatermark,
+  type ChatMessage,
+} from './chat';
+import { MEMBER_INDEX, YOU, type MemberDossier } from './members';
 import { deriveStatus, getSimulation } from './simulation';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -59,12 +66,42 @@ export interface ScoredEventLite {
   daysUntil: number;
 }
 
+/** An address the user has invited before. Offered back as a suggestion. */
+export interface SavedContact {
+  email: string;
+  /** Whatever they typed alongside it, if anything. */
+  label?: string;
+  /** ISO 8601. Most recent first when suggested. */
+  lastUsedAt: string;
+}
+
+/** A member the user has asked onto a specific trip. */
+export interface MemberAsk {
+  memberId: string;
+  eventId: string;
+  groupId?: string;
+  /** ISO 8601. */
+  at: string;
+}
+
 const USER_GROUP_PREFIX = 'usr-';
+
+/** More than this and the suggestion list stops being a shortcut. */
+const MAX_CONTACTS = 40;
 
 const isUserGroup = (g: TravelGroup): boolean => g.id.startsWith(USER_GROUP_PREFIX);
 
 const clampInt = (v: number, lo: number, hi: number): number =>
   Math.max(lo, Math.min(hi, Math.round(v)));
+
+/** Long enough for a real logistical paragraph, short enough not to be a memo. */
+const MAX_MESSAGE_CHARS = 600;
+
+/**
+ * Disambiguates two messages sent inside the same millisecond. Session-local
+ * and never persisted — ids only need to be unique within a thread.
+ */
+let outboundSeq = 0;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // State
@@ -74,14 +111,32 @@ interface SocialState {
   /** False until `persist` has read localStorage. Gate any saved-state UI. */
   hydrated: boolean;
 
-  /** The signed-in member. Editable; persisted. */
-  currentMember: Member;
+  /** The signed-in member. Editable; persisted. Carries their own photograph. */
+  currentMember: MemberDossier;
   /** The user's own signals only. Peers live in the simulation. */
   interests: InterestSignal[];
   /** Simulated groups (with the user's joins applied) plus user-created ones. */
   groups: TravelGroup[];
   /** How many withheld peer signals the live drip has released this session. */
   dripRevealed: number;
+
+  /**
+   * The user's own messages, every cabin, flat and persisted. The simulated
+   * side of each thread is regenerated from `chat.ts` and never stored — same
+   * rule as the peers themselves.
+   */
+  myMessages: ChatMessage[];
+  /** groupId → `sentAt` of the newest message the user has seen. Persisted. */
+  lastReadAt: Record<string, string>;
+
+  /** Addresses this member has invited before. Never leaves the device. */
+  contacts: SavedContact[];
+  /**
+   * Members the user has asked onto a trip. There is no server to deliver an
+   * invitation, so this is exactly what it says it is: a note to themselves
+   * about who they have already approached, and the UI describes it that way.
+   */
+  asks: MemberAsk[];
 
   // ── Mutations ─────────────────────────────────────────────────────────
   setInterest: (eventId: string, level: InterestLevel, note?: string) => void;
@@ -93,9 +148,29 @@ interface SocialState {
   /** Selecting the aircraft is what moves a group to `chartered`. */
   chooseJet: (groupId: string, jet: JetOption | undefined) => void;
 
-  updateProfile: (patch: Partial<Pick<Member, 'name' | 'homeBase' | 'interests' | 'bio'>>) => void;
+  updateProfile: (
+    patch: Partial<Pick<MemberDossier, 'name' | 'homeBase' | 'interests' | 'bio' | 'photoUrl'>>,
+  ) => void;
+  /**
+   * Set or clear the user's own portrait. Expects a `data:` URI already
+   * downscaled by `readImageAsPortrait` — this does not resize, and a full-size
+   * photograph here will exhaust the storage quota on the next write.
+   */
+  setPhoto: (dataUri: string | null) => void;
+
+  /** Remember addresses the user has invited, so they need typing once. */
+  rememberContacts: (emails: readonly string[]) => void;
+  forgetContact: (email: string) => void;
+  /** Note that the user asked specific members onto a trip. Local record only. */
+  noteAsks: (memberIds: readonly string[], eventId: string, groupId?: string) => void;
   revealNextPeer: () => void;
   reset: () => void;
+
+  // ── Conversation ──────────────────────────────────────────────────────
+  /** Append the user's own message to a cabin thread. Returns what was sent. */
+  sendMessage: (groupId: string, body: string) => ChatMessage | null;
+  /** Clear the unread count for a cabin. Idempotent. */
+  markRead: (groupId: string) => void;
 
   // ── Derived ───────────────────────────────────────────────────────────
   interestFor: (eventId: string) => InterestLevel | null;
@@ -106,6 +181,10 @@ interface SocialState {
   myGroupFor: (eventId: string) => TravelGroup | undefined;
   isInGroup: (groupId: string) => boolean;
   myItinerary: () => ScoredEventLite[];
+  /** Seeded thread plus the user's own messages, merged in time order. */
+  messagesFor: (groupId: string) => ChatMessage[];
+  /** Messages newer than the user's last read, excluding their own. */
+  unreadFor: (groupId: string) => number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -113,10 +192,10 @@ interface SocialState {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'meridian.social';
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 4;
 
 interface PersistedV2 {
-  currentMember: Member;
+  currentMember: MemberDossier;
   interests: InterestSignal[];
   /** Only groups the user created — simulated ones are regenerated. */
   userGroups: TravelGroup[];
@@ -124,8 +203,113 @@ interface PersistedV2 {
   joinedGroupIds: string[];
 }
 
+/** v3 adds the conversation. Still only ever the user's own authorship. */
+interface PersistedV3 extends PersistedV2 {
+  myMessages: ChatMessage[];
+  lastReadAt: Record<string, string>;
+}
+
+/**
+ * v4 adds the member's own photograph — it rides along inside `currentMember`,
+ * so nothing new is needed for it here — plus the two things invitations
+ * generate: addresses they have written to, and members they have asked.
+ */
+interface PersistedV4 extends PersistedV3 {
+  contacts: SavedContact[];
+  asks: MemberAsk[];
+}
+
 /** What actually goes to disk. */
-type Persisted = PersistedV2;
+type Persisted = PersistedV4;
+
+/**
+ * A stored photo is a `data:` URI the user chose, but localStorage is editable
+ * by anyone with a console, and `photoUrl` goes straight into an `<img src>`.
+ * Anything that is not a data image URI or an https URL is dropped on the way
+ * back in — this is the one field in the persisted shape that becomes markup.
+ */
+function sanitizePhoto(member: MemberDossier): MemberDossier {
+  const url = member.photoUrl;
+  if (!url) return member;
+  if (/^(data:image\/(png|jpeg|webp|gif|avif);|https:\/\/)/.test(url)) return member;
+  const { photoUrl: _dropped, ...rest } = member;
+  return rest;
+}
+
+function sanitizeContacts(raw: unknown): SavedContact[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SavedContact[] = [];
+  for (const r of raw as unknown[]) {
+    if (!r || typeof r !== 'object') continue;
+    const c = r as Partial<SavedContact>;
+    if (typeof c.email !== 'string' || !c.email.includes('@')) continue;
+    out.push({
+      email: c.email,
+      ...(typeof c.label === 'string' ? { label: c.label } : {}),
+      lastUsedAt: typeof c.lastUsedAt === 'string' ? c.lastUsedAt : new Date(0).toISOString(),
+    });
+  }
+  return out.slice(0, MAX_CONTACTS);
+}
+
+function sanitizeAsks(raw: unknown): MemberAsk[] {
+  if (!Array.isArray(raw)) return [];
+  const out: MemberAsk[] = [];
+  for (const r of raw as unknown[]) {
+    if (!r || typeof r !== 'object') continue;
+    const a = r as Partial<MemberAsk>;
+    if (typeof a.memberId !== 'string' || typeof a.eventId !== 'string') continue;
+    out.push({
+      memberId: a.memberId,
+      eventId: a.eventId,
+      ...(typeof a.groupId === 'string' ? { groupId: a.groupId } : {}),
+      at: typeof a.at === 'string' ? a.at : new Date(0).toISOString(),
+    });
+  }
+  return out;
+}
+
+/**
+ * Anything read back off disk is untrusted — a half-written record, a shape
+ * from a future build, a user who edited localStorage for fun. A malformed
+ * message would render as an empty row forever, so drop it here instead.
+ */
+function sanitizeMessages(raw: unknown): ChatMessage[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ChatMessage[] = [];
+  for (const r of raw as unknown[]) {
+    if (!r || typeof r !== 'object') continue;
+    const m = r as Partial<ChatMessage>;
+    if (
+      typeof m.id !== 'string' ||
+      typeof m.groupId !== 'string' ||
+      typeof m.memberId !== 'string' ||
+      typeof m.body !== 'string' ||
+      typeof m.sentAt !== 'string' ||
+      m.body.trim().length === 0
+    ) {
+      continue;
+    }
+    out.push({
+      id: m.id,
+      groupId: m.groupId,
+      memberId: m.memberId,
+      body: m.body,
+      sentAt: m.sentAt,
+      kind: m.kind === 'system' ? 'system' : 'message',
+    });
+  }
+  return out;
+}
+
+function sanitizeReads(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== 'object') return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === 'string') out[k] = v;
+  }
+  return out;
+}
 
 /**
  * Rebuild the live `groups` array: the simulation, with the user grafted onto
@@ -187,6 +371,10 @@ export const useSocialStore = create<SocialState>()(
       // same value the client computes, so the initial render matches.
       groups: composeGroups(YOU, [], []),
       dripRevealed: 0,
+      myMessages: [],
+      lastReadAt: {},
+      contacts: [],
+      asks: [],
 
       // ── Interest ────────────────────────────────────────────────────────
       setInterest: (eventId, level, note) =>
@@ -311,6 +499,50 @@ export const useSocialStore = create<SocialState>()(
       updateProfile: (patch) =>
         set((s) => ({ currentMember: { ...s.currentMember, ...patch } })),
 
+      setPhoto: (dataUri) =>
+        set((s) => {
+          const next = { ...s.currentMember };
+          if (dataUri) next.photoUrl = dataUri;
+          else delete next.photoUrl;
+          return { currentMember: next };
+        }),
+
+      rememberContacts: (emails) =>
+        set((s) => {
+          const now = new Date().toISOString();
+          const byEmail = new Map(s.contacts.map((c) => [c.email.toLowerCase(), c]));
+          for (const raw of emails) {
+            const email = raw.trim();
+            if (!email) continue;
+            const key = email.toLowerCase();
+            const existing = byEmail.get(key);
+            byEmail.set(key, { ...(existing ?? { email }), email, lastUsedAt: now });
+          }
+          const contacts = [...byEmail.values()]
+            .sort((a, b) => (a.lastUsedAt < b.lastUsedAt ? 1 : -1))
+            .slice(0, MAX_CONTACTS);
+          return { contacts };
+        }),
+
+      forgetContact: (email) =>
+        set((s) => ({
+          contacts: s.contacts.filter((c) => c.email.toLowerCase() !== email.trim().toLowerCase()),
+        })),
+
+      noteAsks: (memberIds, eventId, groupId) =>
+        set((s) => {
+          const at = new Date().toISOString();
+          const seen = new Set(s.asks.map((a) => `${a.memberId}:${a.eventId}`));
+          const added: MemberAsk[] = [];
+          for (const memberId of memberIds) {
+            const key = `${memberId}:${eventId}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            added.push({ memberId, eventId, ...(groupId ? { groupId } : {}), at });
+          }
+          return added.length ? { asks: [...s.asks, ...added] } : {};
+        }),
+
       revealNextPeer: () =>
         set((s) => ({
           dripRevealed: Math.min(s.dripRevealed + 1, getSimulation().dripQueue.length),
@@ -322,6 +554,46 @@ export const useSocialStore = create<SocialState>()(
           interests: [],
           groups: composeGroups(YOU, [], []),
           dripRevealed: 0,
+          myMessages: [],
+          lastReadAt: {},
+          contacts: [],
+          asks: [],
+        }),
+
+      // ── Conversation ────────────────────────────────────────────────────
+      sendMessage: (groupId, body) => {
+        const text = body.trim().replace(/\s+\n/g, '\n').slice(0, MAX_MESSAGE_CHARS);
+        if (text.length === 0) return null;
+        const s = get();
+        // Seeded threads run on the *event's* clock, so for a fixture eight
+        // months out the whole conversation is in the future. `nextSentAt`
+        // stamps the reply after the last thing said rather than dropping it
+        // into the middle of the scrollback.
+        const sentAt = nextSentAt(groupId, s.myMessages, Date.now());
+        const message: ChatMessage = {
+          id: `${groupId}:u${Date.now().toString(36)}${(outboundSeq++).toString(36)}`,
+          groupId,
+          memberId: s.currentMember.id,
+          body: text,
+          sentAt,
+          kind: 'message',
+        };
+        set((prev) => ({
+          myMessages: [...prev.myMessages, message],
+          // You have, by definition, read the thread you just replied to.
+          lastReadAt: { ...prev.lastReadAt, [groupId]: sentAt },
+        }));
+        return message;
+      },
+
+      markRead: (groupId) =>
+        set((s) => {
+          const at = readWatermark(mergeThread(groupId, s.myMessages), Date.now());
+          // Returning the state object itself is the one way to make zustand
+          // skip the notification entirely — an empty partial still allocates a
+          // new state and wakes every subscriber for nothing.
+          if (s.lastReadAt[groupId] === at) return s;
+          return { lastReadAt: { ...s.lastReadAt, [groupId]: at } };
         }),
 
       // ── Derived ─────────────────────────────────────────────────────────
@@ -411,6 +683,17 @@ export const useSocialStore = create<SocialState>()(
           a.start === b.start ? a.name.localeCompare(b.name) : a.start < b.start ? -1 : 1,
         );
       },
+
+      messagesFor: (groupId) => mergeThread(groupId, get().myMessages),
+
+      unreadFor: (groupId) => {
+        const s = get();
+        return countUnread(
+          mergeThread(groupId, s.myMessages),
+          s.lastReadAt[groupId],
+          s.currentMember.id,
+        );
+      },
     }),
     {
       name: STORAGE_KEY,
@@ -426,29 +709,54 @@ export const useSocialStore = create<SocialState>()(
         joinedGroupIds: s.groups
           .filter((g) => !isUserGroup(g) && g.members.some((m) => m.memberId === s.currentMember.id))
           .map((g) => g.id),
+        myMessages: s.myMessages,
+        lastReadAt: s.lastReadAt,
+        contacts: s.contacts,
+        asks: s.asks,
       }),
 
       /**
        * v1 stored the whole `groups` array, simulated cabins included, which
        * meant a dataset change stranded people on flights to events that no
        * longer existed. v2 stores only what the user authored.
+       *
+       * v3 adds the conversation — again, only the user's own messages and
+       * their last-read marks. Every simulated line is regenerated. Both older
+       * shapes forward-fill to empty, so an existing localStorage from either
+       * survives the upgrade with the user's interests and cabins intact.
        */
       migrate: (persisted, version): Persisted => {
-        const p = (persisted ?? {}) as Partial<PersistedV2> & { groups?: TravelGroup[] };
-        if (version < 2) {
-          const all = p.groups ?? [];
-          return {
-            currentMember: p.currentMember ?? YOU,
-            interests: p.interests ?? [],
-            userGroups: all.filter(isUserGroup),
-            joinedGroupIds: all.filter((g) => !isUserGroup(g)).map((g) => g.id),
-          };
-        }
+        const p = (persisted ?? {}) as Partial<PersistedV4> & { groups?: TravelGroup[] };
+
+        const base: PersistedV2 =
+          version < 2
+            ? (() => {
+                const all = p.groups ?? [];
+                return {
+                  currentMember: p.currentMember ?? YOU,
+                  interests: p.interests ?? [],
+                  userGroups: all.filter(isUserGroup),
+                  joinedGroupIds: all.filter((g) => !isUserGroup(g)).map((g) => g.id),
+                };
+              })()
+            : {
+                currentMember: p.currentMember ?? YOU,
+                interests: p.interests ?? [],
+                userGroups: p.userGroups ?? [],
+                joinedGroupIds: p.joinedGroupIds ?? [],
+              };
+
         return {
-          currentMember: p.currentMember ?? YOU,
-          interests: p.interests ?? [],
-          userGroups: p.userGroups ?? [],
-          joinedGroupIds: p.joinedGroupIds ?? [],
+          ...base,
+          currentMember: sanitizePhoto(base.currentMember),
+          // v2 and older simply had no conversation. Empty is correct, not a
+          // loss — the seeded side of every thread comes back regardless.
+          myMessages: version < 3 ? [] : sanitizeMessages(p.myMessages),
+          lastReadAt: version < 3 ? {} : sanitizeReads(p.lastReadAt),
+          // v3 and older had no invitations. Nothing to carry forward; the
+          // member keeps their photograph, which lives inside `currentMember`.
+          contacts: version < 4 ? [] : sanitizeContacts(p.contacts),
+          asks: version < 4 ? [] : sanitizeAsks(p.asks),
         };
       },
 
@@ -457,13 +765,17 @@ export const useSocialStore = create<SocialState>()(
        * is always regenerated, never restored.
        */
       merge: (persisted, current): SocialState => {
-        const p = (persisted ?? {}) as Partial<PersistedV2>;
-        const currentMember = p.currentMember ?? current.currentMember;
+        const p = (persisted ?? {}) as Partial<PersistedV4>;
+        const currentMember = sanitizePhoto(p.currentMember ?? current.currentMember);
         return {
           ...current,
           currentMember,
           interests: p.interests ?? [],
           groups: composeGroups(currentMember, p.joinedGroupIds ?? [], p.userGroups ?? []),
+          myMessages: sanitizeMessages(p.myMessages),
+          lastReadAt: sanitizeReads(p.lastReadAt),
+          contacts: sanitizeContacts(p.contacts),
+          asks: sanitizeAsks(p.asks),
         };
       },
 

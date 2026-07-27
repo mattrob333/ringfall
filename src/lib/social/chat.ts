@@ -66,7 +66,7 @@ export const CHAT_SEED = `${WORLD_SEED}.chat.v1`;
  * has not had the second conversation yet — that is the point of the ladder.
  */
 const VOLUME: Record<GroupStatus, { mid: number; late: number }> = {
-  forming: { mid: 2, late: 0 },
+  forming: { mid: 3, late: 0 },
   quorum: { mid: 3, late: 2 },
   chartered: { mid: 4, late: 4 },
   locked: { mid: 4, late: 6 },
@@ -97,8 +97,12 @@ interface ThreadCtx {
   port: string;
   city: string;
   eventName: string;
-  /** The airframe if one is held, otherwise the honest generic. */
+  /** Event name up to the first dash or colon — what people actually call it. */
+  shortName: string;
+  /** The airframe if one is held or the host owns one, otherwise `the aircraft`. */
   jetName: string;
+  /** The same, with an article: `a Falcon 8X`, or `the aircraft` if unknown. */
+  cabinA: string;
   jetHeld: boolean;
   day: string;
   dayBack: string;
@@ -127,9 +131,12 @@ interface Turn {
 // ─────────────────────────────────────────────────────────────────────────────
 // The lines
 //
-// Each pool is a list of closures over the turn. They are written to be read
-// aloud: if a line would sound odd said by a fifty-year-old who owns a Falcon,
-// it does not belong here.
+// Each entry is a closure over the turn, optionally guarded by `ok`. The guard
+// is what keeps the thread from saying something stupid: a member who lives in
+// Milan does not announce that he is flying in from elsewhere, a cabin with no
+// airframe held does not discuss its hold, and nobody reminisces about "the
+// three of us" in a group of two. Generated copy is only convincing while it
+// is never once wrong about a fact the reader can see on the same card.
 // ─────────────────────────────────────────────────────────────────────────────
 
 type Topic =
@@ -144,153 +151,330 @@ type Topic =
   | 'aside'
   | 'close';
 
-const LINES: Record<Topic, readonly ((t: Turn) => string)[]> = {
+interface Line {
+  /** Omitted means "always sayable". */
+  ok?: (t: Turn) => boolean;
+  say: (t: Turn) => string;
+}
+
+// ── Guards ──────────────────────────────────────────────────────────────────
+/** The speaker does not already live where the event is. */
+const away = (t: Turn): boolean => t.me.homeBase.city !== t.c.city;
+/** The speaker is not based on the departure hub. */
+const offHub = (t: Turn): boolean => t.me.homeBase.homeJetPort !== t.c.hub;
+/** There is a third party worth naming, somewhere that is not here. */
+const elsewhere = (t: Turn): boolean =>
+  t.other.id !== t.me.id &&
+  t.other.homeBase.city !== t.c.city &&
+  t.other.homeBase.city !== t.me.homeBase.city;
+/** Enough people for a story about "us". */
+const crowd = (t: Turn): boolean => t.c.cast.length >= 3;
+/** Somebody else to address by name. */
+const named = (t: Turn): boolean => t.other.id !== t.me.id;
+/** An airframe is actually held. */
+const held = (t: Turn): boolean => t.c.jetHeld;
+/** Seats remain. */
+const openSeats = (t: Turn): boolean => t.c.seatsLeft > 0;
+/** The trip is real: aircraft held, or the manifest closed. */
+const settled = (t: Turn): boolean =>
+  t.c.group.status === 'chartered' || t.c.group.status === 'locked';
+
+const LINES: Record<Topic, readonly Line[]> = {
   // ── The host sets it out ────────────────────────────────────────────────
   open: [
-    (t) =>
-      `${t.c.day} morning out of ${t.c.hub}, back on the ${t.c.dayBack}. The slot is provisional until the week before and I will post it here when it firms up.`,
-    (t) =>
-      `Thread for ${t.c.eventName}. ${t.c.hub} out, ${t.c.port} in, and the ground at the other end is handled. Ask here rather than texting me separately.`,
-    (t) =>
-      `Cabin is ${t.c.capacity}. ${t.c.city} by early afternoon on the ${t.c.day}, and nothing that happens after that is my responsibility.`,
-    (t) =>
-      `Right. ${t.c.hub}, ${t.c.day}, customs from an hour before. I have flown this route enough times to know the only thing that ever goes wrong is the ramp at ${t.c.port}.`,
-    (t) =>
-      `Putting the ${t.c.city} week together properly this year. Out on the ${t.c.day}, back on the ${t.c.dayBack}, and I am not moving either date.`,
-    (t) =>
-      `${t.c.hub} on the ${t.c.day}. Everything else is negotiable and those two things are not.`,
+    {
+      say: (t) =>
+        `${t.c.day} morning out of ${t.c.hub}, back on the ${t.c.dayBack}. The slot is provisional until the week before and I will post it here when it firms up.`,
+    },
+    {
+      say: (t) =>
+        `Thread for ${t.c.shortName}. ${t.c.hub} out, ${t.c.port} in, and the ground at the other end is handled. Ask here rather than texting me separately.`,
+    },
+    {
+      say: (t) =>
+        `Cabin is ${t.c.capacity}. ${t.c.city} by early afternoon on the ${t.c.day}, and nothing that happens after that is my responsibility.`,
+    },
+    {
+      say: (t) =>
+        `Right. ${t.c.hub}, ${t.c.day}, customs from an hour before. I have flown this route enough times to know the only thing that ever goes wrong is the ramp at ${t.c.port}.`,
+    },
+    {
+      say: (t) =>
+        `Putting the ${t.c.city} week together properly this year. Out on the ${t.c.day}, back on the ${t.c.dayBack}, and I am not moving either date.`,
+    },
+    {
+      say: (t) =>
+        `${t.c.hub} on the ${t.c.day}. Everything else is negotiable and those two things are not.`,
+    },
+    {
+      say: (t) =>
+        `${t.c.capacity} seats, ${t.c.hub}, ${t.c.day}. I have done ${t.c.shortName} every year for long enough to know that the flight is the easy part.`,
+    },
   ],
 
   // ── Confirmations ───────────────────────────────────────────────────────
   confirm: [
-    (t) =>
-      `In. I will come up from ${t.me.homeBase.city} the night before rather than trust a morning connection.`,
-    () => `Yes. I will be at the FBO from eight.`,
-    () =>
-      `Down for it. Same as last year, assuming last year is the benchmark and not the warning.`,
-    (t) => `Confirmed. The ${t.c.dayBack} return suits me, I have nothing on the Monday.`,
-    () => `In, and I am bringing nobody. Learned that lesson.`,
-    (t) =>
-      `Yes to all of it. ${t.otherFirst}, are you coming, or is this another year of watching you decide.`,
-    (t) =>
-      `Booked out of ${t.me.homeBase.homeJetPort} already, so consider me committed whether or not the slot moves.`,
+    {
+      ok: offHub,
+      say: (t) =>
+        `In. I will come up from ${t.me.homeBase.city} the night before rather than trust a morning connection.`,
+    },
+    { say: () => `Yes. I will be at the FBO from eight.` },
+    {
+      say: () =>
+        `Down for it. Same as last year, assuming last year is the benchmark and not the warning.`,
+    },
+    {
+      say: (t) => `Confirmed. The ${t.c.dayBack} return suits me, I have nothing on the Monday.`,
+    },
+    { say: () => `In, and I am bringing nobody. Learned that lesson.` },
+    {
+      ok: named,
+      say: (t) =>
+        `Yes, all of it. ${t.otherFirst}, you were the one complaining last year that nobody organises anything, so I will expect you at the aircraft.`,
+    },
+    {
+      ok: offHub,
+      say: (t) =>
+        `Booked out of ${t.me.homeBase.homeJetPort} already, so consider me committed whether or not the slot moves.`,
+    },
+    {
+      say: () => `Put me down. I have not been in three years and I have run out of excuses.`,
+    },
   ],
 
   // ── Somebody with the metal offers seats ────────────────────────────────
   offer: [
-    (t) =>
-      `If ${t.c.hub} is awkward for anyone, I am taking the ${t.me.aircraft} out of ${t.me.homeBase.homeJetPort} on the ${t.c.day} and there are ${t.rng.int(2, 4)} seats in the back.`,
-    (t) =>
-      `The ${t.me.aircraft} is positioning that morning anyway. Two seats going if somebody is coming from ${t.me.homeBase.city} or anywhere near it.`,
-    (t) =>
-      `${t.otherFirst} — you are in ${t.other.homeBase.city}. I route through there. Say the word and I will pick you up.`,
-    (t) =>
-      `I can put three on the ${t.me.aircraft} if the ${t.c.hub} timing does not work. Not a favour, the seats are empty either way.`,
+    {
+      ok: offHub,
+      say: (t) =>
+        `If ${t.c.hub} is awkward for anyone, I am taking the ${t.me.aircraft} out of ${t.me.homeBase.homeJetPort} on the ${t.c.day} and there are ${t.rng.int(2, 4)} seats in the back.`,
+    },
+    {
+      say: (t) =>
+        `The ${t.me.aircraft} is positioning that morning anyway. Two seats going if anybody is coming from ${t.me.homeBase.city} or near it.`,
+    },
+    {
+      ok: elsewhere,
+      say: (t) =>
+        `${t.otherFirst} — you are in ${t.other.homeBase.city}. I route through there. Say the word and I will collect you.`,
+    },
+    {
+      ok: offHub,
+      say: (t) =>
+        `I can put three on the ${t.me.aircraft} if the ${t.c.hub} timing does not work. Not a favour — the seats are empty either way.`,
+    },
   ],
 
   // ── Where everyone is sleeping ──────────────────────────────────────────
   stay: [
-    () =>
-      `Who is staying where. I would rather settle it now than negotiate it in a car at eleven at night.`,
-    () =>
-      `I have the same house as last year and two rooms nobody has claimed. Speak up before I give them back.`,
-    (t) =>
-      `Taken a villa twenty minutes out of ${t.c.city}. Quieter, and there is a cook. Four of you would fit.`,
-    (t) => `Do not book the place on the water in ${t.c.city}. It was a mistake and I made it twice.`,
-    (t) =>
-      `Rooms in ${t.c.city} are gone from the ${t.c.day} — I checked this morning. If you have not booked, tell me and I will make a call.`,
-    (t) =>
-      `${t.otherFirst} and I are at the same address again. There is a third room and it is better than the second.`,
+    {
+      say: () =>
+        `Who is staying where. I would rather settle it now than negotiate it in a car at eleven at night.`,
+    },
+    {
+      say: () =>
+        `I have the same house as last year and two rooms nobody has claimed. Speak up before I give them back.`,
+    },
+    {
+      say: (t) =>
+        `Taken a villa twenty minutes out of ${t.c.city}. Quieter, and there is a cook. Four of you would fit.`,
+    },
+    {
+      say: (t) => `Do not book the place on the water in ${t.c.city}. It was a mistake and I made it twice.`,
+    },
+    {
+      say: (t) =>
+        `Rooms in ${t.c.city} are gone from the ${t.c.day} — I checked this morning. If you have not booked, tell me and I will make a call.`,
+    },
+    {
+      ok: named,
+      say: (t) =>
+        `${t.otherFirst} and I are at the same address again. There is a third room and it is better than the second.`,
+    },
+    {
+      say: (t) =>
+        `The house is fifteen minutes from ${t.c.venue}, which matters more than anything else about it.`,
+    },
   ],
 
   // ── Tables, passes, the reason anyone is going ──────────────────────────
   table: [
-    (t) =>
-      `Table on the ${t.c.day} at nine, eight covers. Tell me by the Friday or I give the seats back.`,
-    (t) =>
-      `I have four passes for ${t.c.venue} and I am not going to use all of them. First to ask.`,
-    (t) =>
-      `Dinner is arranged for the ${t.c.dayBack}. Nobody has to come, and I will notice who does not.`,
-    (t) =>
-      `${t.c.venue2} on the ${t.c.day} — worth doing properly rather than at the end of a long lunch.`,
-    (t) =>
-      `Booked the usual place in ${t.c.city} for the first night. Six of us. It is not a discussion, it is a booking.`,
-    () =>
-      `Whoever handled the table last year should handle it again, because I did and it was not a success.`,
+    {
+      say: (t) =>
+        `Table on the ${t.c.day} at nine, eight covers. Tell me by the Friday or I give the seats back.`,
+    },
+    {
+      say: (t) =>
+        `I have four passes for ${t.c.venue} and I will not use all of them. First to ask.`,
+    },
+    {
+      say: (t) =>
+        `Dinner is arranged for the first night. Nobody has to come, and I will notice who does not.`,
+    },
+    {
+      say: (t) =>
+        `${t.c.venue2} on the ${t.c.day} — worth doing properly rather than at the end of a long lunch.`,
+    },
+    {
+      say: (t) =>
+        `Booked the usual place in ${t.c.city} for the ${t.c.day}. Six of us. It is not a discussion, it is a booking.`,
+    },
+    {
+      say: () =>
+        `Whoever handled the table last year should handle it again, because I did and it was not a success.`,
+    },
+    {
+      say: (t) =>
+        `I am not doing ${t.c.venue} twice in one week, so somebody else can take the second set of passes.`,
+    },
   ],
 
   // ── Arriving early, leaving late, not on the aircraft at all ────────────
   timing: [
-    (t) =>
-      `I am in a day early for ${t.c.venue}. Do not hold the aircraft for me on the way out.`,
-    (t) =>
-      `Coming separately — I am in ${t.me.homeBase.city} until the Wednesday and the backtrack is not worth it. I will meet everyone at the house.`,
-    (t) =>
-      `Take me off the return. I am going on to ${t.other.homeBase.city} from ${t.c.port}, so somebody can have the seat back.`,
-    (t) =>
-      `Landing ${t.c.port} the night before. Happy to meet the aircraft if that is useful to anyone.`,
-    (t) =>
-      `I need to be back in ${t.me.homeBase.city} by the Monday morning. If the ${t.c.dayBack} slips I will go commercial and say nothing about it.`,
-    () =>
-      `Two of us are staying on for the week afterwards, so the return is lighter than the outbound. Worth knowing when the numbers are done.`,
+    {
+      say: (t) =>
+        `I am in a day early for ${t.c.venue}. Do not hold the aircraft for me on the way out.`,
+    },
+    {
+      ok: (t) => away(t) && offHub(t),
+      say: (t) =>
+        `Coming separately — I am in ${t.me.homeBase.city} until the Wednesday and the backtrack is not worth it. I will meet everyone at the house.`,
+    },
+    {
+      ok: elsewhere,
+      say: (t) =>
+        `Take me off the return. I am going on to ${t.other.homeBase.city} from ${t.c.port}, so somebody can have the seat back.`,
+    },
+    {
+      say: (t) =>
+        `Landing ${t.c.port} the night before. Happy to meet the aircraft if that is useful to anyone.`,
+    },
+    {
+      ok: away,
+      say: (t) =>
+        `I need to be back in ${t.me.homeBase.city} by the Monday morning. If the ${t.c.dayBack} slips I will go commercial and say nothing more about it.`,
+    },
+    {
+      ok: crowd,
+      say: () =>
+        `Two of us are staying on for the week afterwards, so the return is lighter than the outbound. Worth knowing when the numbers are done.`,
+    },
+    {
+      say: (t) =>
+        `What time are we actually wheels up on the ${t.c.day}. I have a call at eight that I can move exactly once.`,
+    },
   ],
 
   // ── Ground, bags, ramp, the unglamorous half ────────────────────────────
   ground: [
-    (t) =>
-      `Cars are arranged at ${t.c.port}. Two of them, and one takes cases properly.`,
-    (t) =>
-      `Bags — the hold on a ${t.c.jetName} is smaller than people think. One case each and nothing rigid.`,
-    (t) =>
-      `What is the ramp situation at ${t.c.port} that week. Last time we parked at the far end and walked, in the wrong shoes.`,
-    (t) =>
-      `I will do the ground at the other end. It is the one part of this I am reliably good at.`,
-    (t) =>
-      `Handling at ${t.c.hub} have the manifest. Passports to me by the Friday before or you are explaining yourself at the desk.`,
-    (t) =>
-      `Catering — nothing hot. Nobody has ever thanked me for a hot meal on a ${t.c.hours} hour leg and two people have complained.`,
+    { say: (t) => `Cars are arranged at ${t.c.port}. Two of them, and one takes cases properly.` },
+    {
+      say: (t) =>
+        `Bags — the hold on ${t.c.cabinA} is smaller than people think. One case each and nothing rigid.`,
+    },
+    {
+      say: (t) =>
+        `What is the ramp situation at ${t.c.port} that week. Last time we parked at the far end and walked, in the wrong shoes.`,
+    },
+    {
+      say: () => `I will do the ground at the other end. It is the one part of this I am reliably good at.`,
+    },
+    {
+      say: (t) =>
+        `Handling at ${t.c.hub} have the manifest. Passports to me by the Friday before, or you are explaining yourself at the desk.`,
+    },
+    {
+      say: (t) =>
+        `Catering — nothing hot. Nobody has ever thanked me for a hot meal on a ${t.c.hours} hour leg and two people have complained.`,
+    },
+    {
+      say: (t) =>
+        `Customs at ${t.c.port} took forty minutes last year. Build it into whatever you have booked for the afternoon.`,
+    },
   ],
 
   // ── The economics, discussed the way these people discuss them ──────────
   seats: [
-    () =>
-      `Per seat looks right for the metal. I have paid a great deal more for a great deal less.`,
-    (t) =>
-      `${t.c.seatsLeft} seats still open. If you know somebody, ask them properly rather than posting it about.`,
-    (t) =>
-      `We are ${t.c.filled} of ${t.c.capacity}. One more and the number per seat stops being irritating.`,
-    (t) =>
-      `Is the ${t.c.jetName} actually held, or are we still hoping. I ask because I have been caught before.`,
-    () =>
-      `Splitting it this way is the only sane version of this trip. The alternative is four separate aircraft and everyone pretending that is normal.`,
+    {
+      say: () => `Per seat looks right for the metal. I have paid a great deal more for a great deal less.`,
+    },
+    {
+      ok: openSeats,
+      say: (t) =>
+        `${t.c.seatsLeft} seats still open. If you know somebody, ask them properly rather than posting it about.`,
+    },
+    {
+      ok: openSeats,
+      say: (t) =>
+        `We are ${t.c.filled} of ${t.c.capacity}. One more and the number per seat stops being irritating.`,
+    },
+    {
+      ok: (t) => !held(t),
+      say: () => `Is the aircraft actually held, or are we still hoping. I ask because I have been caught before.`,
+    },
+    {
+      ok: held,
+      say: (t) => `Good airframe. I have flown the ${t.c.jetName} out of ${t.c.hub} and it is quiet enough to talk in.`,
+    },
+    {
+      say: () =>
+        `Splitting it this way is the only sane version of this trip. The alternative is four aircraft and everybody pretending that is normal.`,
+    },
   ],
 
-  // ── Warmth. The reason the club is the product. ─────────────────────────
+  // ── Warmth. The club is the product. ────────────────────────────────────
   aside: [
-    (t) => `Somebody remind me why we do this in ${t.c.month}.`,
-    (t) =>
-      `${t.otherFirst} arrived with a dog last year. I want it on the record that I said nothing at the time.`,
-    () =>
-      `Good group. That is most of the reason I go, and I have stopped pretending otherwise.`,
-    (t) =>
-      `${t.otherFirst}, are you still not speaking to the people at ${t.c.venue}, or has that been resolved.`,
-    (t) =>
-      `Last time this cabin flew, three of us ended up in ${t.other.homeBase.city} for reasons nobody has explained since.`,
-    (t) =>
-      `I have been going to ${t.c.eventName} since before it was worth going to, and it is still worth going to.`,
+    { say: (t) => `Somebody remind me why we do this in ${t.c.month}.` },
+    {
+      ok: named,
+      say: (t) =>
+        `${t.otherFirst} arrived with a dog last year. I want it on the record that I said nothing at the time.`,
+    },
+    {
+      say: () => `Good group. That is most of the reason I go, and I have stopped pretending otherwise.`,
+    },
+    {
+      ok: named,
+      say: (t) =>
+        `${t.otherFirst}, are you still not speaking to the people at ${t.c.venue}, or has that been resolved.`,
+    },
+    {
+      ok: (t) => crowd(t) && elsewhere(t),
+      say: (t) =>
+        `Last time this cabin flew, three of us ended up in ${t.other.homeBase.city} for reasons nobody has ever explained.`,
+    },
+    {
+      say: (t) =>
+        `I have been going to ${t.c.shortName} since before it was worth going to, and it is still worth going to.`,
+    },
+    {
+      say: (t) =>
+        `The point of ${t.c.shortName} is not ${t.c.shortName}. It is the four days around it, which is why I care who is on the aircraft.`,
+    },
   ],
 
   // ── The host closes it out ──────────────────────────────────────────────
   close: [
-    (t) => `Manifest is what it is. See everyone at ${t.c.hub} on the ${t.c.day}.`,
-    (t) =>
-      `Ground schedule goes out tonight. Read it or do not, but do not ask me on the ${t.c.day}.`,
-    (t) =>
-      `Everything is booked. I am not answering anything else until we are airborne.`,
-    (t) =>
-      `That is us. ${t.c.hub}, ${t.c.day}, and the aircraft leaves whether or not you are on it.`,
+    { say: (t) => `Manifest is what it is. See everyone at ${t.c.hub} on the ${t.c.day}.` },
+    {
+      say: (t) => `Ground schedule goes out tonight. Read it or do not, but do not ask me on the ${t.c.day}.`,
+    },
+    {
+      ok: settled,
+      say: () => `Everything is booked. I am not answering anything else until we are airborne.`,
+    },
+    {
+      say: (t) => `That is us. ${t.c.hub}, ${t.c.day}, and the aircraft leaves whether or not you are on it.`,
+    },
+    {
+      ok: openSeats,
+      say: (t) =>
+        `Still ${t.c.seatsLeft} short of a full cabin, which I can live with. Anyone you would actually want to sit next to, send them to me.`,
+    },
   ],
 };
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // System lines
@@ -374,13 +558,20 @@ function plan(status: GroupStatus, castSize: number, jetHeld: boolean, rng: Rng)
   const mid = Math.max(1, vol.mid + (rng.chance(0.35) ? 1 : 0));
   const late = vol.late > 0 ? vol.late + (rng.chance(0.3) ? 1 : 0) : 0;
 
+  // Somebody joins, *then* speaks. The reverse reads as a bug, and it is one.
   const beats: Beat[] = [{ kind: 'message', topic: 'open' }];
-  beats.push({ kind: 'message', topic: 'confirm' });
   if (castSize > 2) beats.push({ kind: 'system', system: 'join' });
   beats.push({ kind: 'message', topic: 'confirm' });
 
   const midTopics: Topic[] = ['stay', 'table', 'timing', 'offer', 'aside'];
-  for (let i = 0; i < mid; i++) beats.push({ kind: 'message', topic: rng.pick(midTopics) });
+  for (let i = 0; i < mid; i++) {
+    beats.push({ kind: 'message', topic: rng.pick(midTopics) });
+    // The second arrival lands mid-conversation, where arrivals actually land.
+    if (i === 0 && castSize > 4) {
+      beats.push({ kind: 'system', system: 'join' });
+      beats.push({ kind: 'message', topic: 'confirm' });
+    }
+  }
 
   if (status !== 'forming') beats.push({ kind: 'system', system: 'quorum' });
 
@@ -411,6 +602,10 @@ export function buildThread(group: TravelGroup, event: WorldEvent): ChatMessage[
   const rng = makeRng(`${CHAT_SEED}:${group.id}`);
   const startDate = new Date(`${event.start}T00:00:00Z`);
   const filled = group.members.length;
+  // Nobody says "Fuorisalone — Milano Design Week" out loud. They say
+  // "Fuorisalone". Cut at the first dash or colon and keep whatever is left.
+  const shortName = (event.name.split(/\s+[—–-]\s+|:\s+/)[0] ?? event.name).trim();
+  const airframe = group.jet?.aircraft ?? host.aircraft;
 
   const c: ThreadCtx = {
     group,
@@ -421,7 +616,9 @@ export function buildThread(group: TravelGroup, event: WorldEvent): ChatMessage[
     port: event.nearestJetPort.code,
     city: event.city,
     eventName: event.name,
-    jetName: group.jet?.aircraft ?? host.aircraft ?? 'the aircraft',
+    shortName,
+    jetName: airframe ?? 'aircraft',
+    cabinA: airframe ? `a ${airframe}` : 'this aircraft',
     jetHeld: Boolean(group.jet),
     day: DAYS[startDate.getUTCDay()]!,
     dayBack: DAYS[(startDate.getUTCDay() + 3) % 7]!,
@@ -446,7 +643,13 @@ export function buildThread(group: TravelGroup, event: WorldEvent): ChatMessage[
   // at least a chance to appear before anyone repeats.
   const spoken = new Map<string, number>();
   let last: string | null = null;
-  const speaker = (eligible: Member[]): Member => {
+  const take = (m: Member): Member => {
+    spoken.set(m.id, (spoken.get(m.id) ?? 0) + 1);
+    last = m.id;
+    return m;
+  };
+  const speaker = (eligible: Member[], forced?: Member | null): Member => {
+    if (forced && eligible.includes(forced)) return take(forced);
     const pool = eligible.length > 1 ? eligible.filter((m) => m.id !== last) : eligible;
     const options = pool.length > 0 ? pool : eligible;
     const weights = options.map((m) => {
@@ -454,26 +657,42 @@ export function buildThread(group: TravelGroup, event: WorldEvent): ChatMessage[
       const base = m.id === host.id ? 2.2 : 1;
       return base / (1 + said * 1.4);
     });
-    const chosen = rng.weighted(options, weights);
-    spoken.set(chosen.id, (spoken.get(chosen.id) ?? 0) + 1);
-    last = chosen.id;
-    return chosen;
+    return take(rng.weighted(options, weights));
   };
 
   // Template reuse is what makes generated copy smell. Nothing repeats inside
-  // a thread until the pool is genuinely exhausted.
+  // a thread until the pool is genuinely exhausted, and nothing is said that
+  // its own guard rejects — a guarded-out pool falls back to `aside`, which is
+  // sayable by anyone anywhere.
   const used = new Set<string>();
-  const line = (topic: Topic, turn: Turn): string => {
+  const line = (topic: Topic, turn: Turn): string | null => {
     const pool = LINES[topic];
-    const fresh = pool.filter((_, i) => !used.has(`${topic}:${i}`));
-    const from = fresh.length > 0 ? fresh : pool;
-    const fn = rng.pick(from);
-    used.add(`${topic}:${pool.indexOf(fn)}`);
-    return fn(turn);
+    const sayable = pool.filter((l) => (l.ok ? l.ok(turn) : true));
+    if (sayable.length === 0) return null;
+    const fresh = sayable.filter((l) => !used.has(`${topic}:${pool.indexOf(l)}`));
+    const from = fresh.length > 0 ? fresh : sayable;
+    const chosen = rng.pick(from);
+    used.add(`${topic}:${pool.indexOf(chosen)}`);
+    return chosen.say(turn);
   };
 
   const joiners = c.cast.filter((m) => m.id !== host.id);
   let joinCursor = 0;
+  /** Set by a join line, consumed by the confirmation that follows it. */
+  let pendingJoiner: Member | null = null;
+  /**
+   * Members who have a join line coming later in the thread are held out of
+   * the conversation until it fires. Everyone else is assumed to have been on
+   * the manifest since before the thread started, which is true — the join
+   * lines mark the arrivals worth marking, not all of them.
+   */
+  const notYetArrived = new Set(
+    joiners.slice(0, beats.filter((b) => b.system === 'join').length).map((m) => m.id),
+  );
+  const arrived = (pool: Member[]): Member[] => {
+    const here = pool.filter((m) => !notYetArrived.has(m.id));
+    return here.length > 0 ? here : pool;
+  };
 
   const drafted: Array<Omit<ChatMessage, 'sentAt' | 'id'>> = [];
 
@@ -482,6 +701,10 @@ export function buildThread(group: TravelGroup, event: WorldEvent): ChatMessage[
       if (beat.system === 'join') {
         const who = joiners[joinCursor % Math.max(1, joiners.length)] ?? host;
         joinCursor += 1;
+        // Whoever just walked in is the one who speaks next. A confirmation
+        // from somebody the reader has not seen arrive is a continuity error.
+        notYetArrived.delete(who.id);
+        pendingJoiner = who;
         drafted.push({ groupId: group.id, memberId: who.id, body: systemJoin(who), kind: 'system' });
       } else if (beat.system === 'quorum') {
         drafted.push({ groupId: group.id, memberId: host.id, body: systemQuorum(c), kind: 'system' });
@@ -497,20 +720,27 @@ export function buildThread(group: TravelGroup, event: WorldEvent): ChatMessage[
 
     // Who is allowed to say this? The host opens and closes; only somebody who
     // actually owns metal offers seats on it.
+    const guests = arrived(c.cast.filter((m) => m.id !== host.id));
     let eligible: Member[];
     if (topic === 'open' || topic === 'close') {
       eligible = [host];
+    } else if (topic === 'confirm') {
+      // Nobody accepts their own invitation.
+      eligible = guests.length > 0 ? guests : [host];
     } else if (topic === 'offer') {
-      eligible = c.cast.filter((m) => Boolean(m.aircraft));
-      if (eligible.length === 0) {
+      const owners = arrived(c.cast.filter((m) => Boolean(m.aircraft)));
+      if (owners.length === 0 || !owners.some((m) => m.aircraft)) {
         topic = 'stay';
-        eligible = c.cast;
+        eligible = arrived(c.cast);
+      } else {
+        eligible = owners;
       }
     } else {
-      eligible = c.cast.length > 1 ? c.cast : [host];
+      eligible = c.cast.length > 1 ? arrived(c.cast) : [host];
     }
 
-    const me = speaker(eligible);
+    const me = speaker(eligible, topic === 'confirm' ? pendingJoiner : null);
+    pendingJoiner = null;
     const others = c.cast.filter((m) => m.id !== me.id);
     const other = others.length > 0 ? rng.pick(others) : me;
     const turn: Turn = {
@@ -522,12 +752,11 @@ export function buildThread(group: TravelGroup, event: WorldEvent): ChatMessage[
       rng,
     };
 
-    drafted.push({
-      groupId: group.id,
-      memberId: me.id,
-      body: line(topic, turn),
-      kind: 'message',
-    });
+    const body = line(topic, turn) ?? line('aside', turn);
+    // A beat with nothing sayable is dropped rather than filled with filler.
+    if (body) {
+      drafted.push({ groupId: group.id, memberId: me.id, body, kind: 'message' });
+    }
   }
 
   const times = timeline(drafted.length, group, event, rng);
@@ -621,11 +850,15 @@ export function countUnread(
   return n;
 }
 
-/** The timestamp `markRead` should store — never behind the newest message. */
+/**
+ * The timestamp `markRead` should store: the newest message in the thread, not
+ * the wall clock. Deliberately idempotent — calling it twice with no new
+ * messages produces the same string, so an effect that marks a thread read
+ * cannot drive a render loop.
+ */
 export function readWatermark(messages: readonly ChatMessage[], now: number): string {
-  const last = messages.length > 0 ? Date.parse(messages[messages.length - 1]!.sentAt) : Number.NaN;
-  const floor = Number.isFinite(last) ? last : now;
-  return new Date(Math.max(now, floor)).toISOString();
+  const last = messages[messages.length - 1];
+  return last ? last.sentAt : new Date(now).toISOString();
 }
 
 /** Clamp used by the group card's badge. Exported so the copy stays in one place. */

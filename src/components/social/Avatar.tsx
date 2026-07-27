@@ -1,5 +1,5 @@
 import { cn } from '@/components/ui';
-import { avatarSpec, initialsFrom } from '@/lib/social/avatar';
+import { MemberPortrait, PortraitPlate } from './MemberPortrait';
 
 export interface AvatarProps {
   /** The member's `avatarSeed`. Same seed always draws the same plate. */
@@ -16,14 +16,25 @@ export interface AvatarProps {
   accented?: boolean;
   /** Set when the avatar sits next to its own label and would be redundant. */
   decorative?: boolean;
+  /**
+   * A real photograph, when the record has one. Optional and usually absent —
+   * pass `member.photoUrl` and the same call site works for both.
+   */
+  photoUrl?: string;
 }
 
 /**
- * A generated plate, not a photograph.
+ * A member's face at small sizes: their photograph if there is one, the
+ * generated plate if not.
  *
- * Deterministic and dependency-free — the same markup renders on the server and
- * on the client, so this is safe above the hydration boundary and inside it.
- * See `lib/social/avatar.ts` for the generator.
+ * The props here have not changed — every existing call site draws the same
+ * thing, better. The generator moved to `lib/social/portrait.ts`, which layers
+ * a duotone plate, a soft form under a single key light, engine-turned
+ * hairlines and the brass frame; below ~56px it drops to the plate, the frame
+ * and the monogram, because detail at 24px is mud.
+ *
+ * Deterministic and dependency-free when there is no photograph, so this stays
+ * safe on both sides of the hydration boundary.
  */
 export function Avatar({
   seed,
@@ -32,83 +43,30 @@ export function Avatar({
   className,
   accented = false,
   decorative = false,
+  photoUrl,
 }: AvatarProps) {
-  const spec = avatarSpec(seed);
-  const initials = initialsFrom(name);
-  const id = `av${spec.key}`;
-  const r = size / 2;
-  const ringR = r - 0.5;
+  if (photoUrl) {
+    return (
+      <MemberPortrait
+        seed={seed}
+        size={size}
+        name={name}
+        photoUrl={photoUrl}
+        accented={accented}
+        decorative={decorative}
+        className={className}
+      />
+    );
+  }
 
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox={`0 0 ${size} ${size}`}
-      className={cn('shrink-0 select-none', className)}
-      role={decorative ? 'presentation' : 'img'}
-      aria-label={decorative ? undefined : name}
-      aria-hidden={decorative || undefined}
-    >
-      <defs>
-        <linearGradient id={`${id}p`} gradientTransform={`rotate(${spec.angle} 0.5 0.5)`}>
-          <stop offset="0%" stopColor={spec.plateTop} />
-          <stop offset="100%" stopColor={spec.plateBottom} />
-        </linearGradient>
-        <radialGradient id={`${id}s`} cx="28%" cy="20%" r="72%">
-          <stop offset="0%" stopColor="rgba(255,255,255,0.16)" />
-          <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-        </radialGradient>
-      </defs>
-
-      {/* The plate */}
-      <circle cx={r} cy={r} r={r} fill={`url(#${id}p)`} />
-      {/* Light from the top-left, matching the product's single-source lighting */}
-      <circle cx={r} cy={r} r={r} fill={`url(#${id}s)`} />
-      {/* Brass hairline — the house metal, at one pixel, always */}
-      <circle
-        cx={r}
-        cy={r}
-        r={ringR}
-        fill="none"
-        stroke={`rgba(200,168,102,${spec.ringAlpha})`}
-        strokeWidth={1}
-      />
-      {/* Inner engraving */}
-      <circle
-        cx={r}
-        cy={r}
-        r={Math.max(0, ringR - 2.5)}
-        fill="none"
-        stroke="rgba(244,241,234,0.05)"
-        strokeWidth={1}
-      />
-      {accented && (
-        <circle
-          cx={r}
-          cy={r}
-          r={Math.max(0, ringR - 1.5)}
-          fill="none"
-          stroke={spec.accent}
-          strokeOpacity={0.55}
-          strokeWidth={1}
-        />
-      )}
-
-      <text
-        x="50%"
-        y="50%"
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill={spec.monogram}
-        fontSize={Math.round(size * 0.34 * 10) / 10}
-        letterSpacing={Math.round(size * 0.012 * 10) / 10}
-        style={{
-          fontFamily:
-            "Didot, 'Bodoni MT', 'Playfair Display', 'Hoefler Text', Garamond, 'Times New Roman', serif",
-        }}
-      >
-        {initials}
-      </text>
-    </svg>
+    <PortraitPlate
+      seed={seed}
+      size={size}
+      name={name}
+      accented={accented}
+      decorative={decorative}
+      className={cn('shrink-0', className)}
+    />
   );
 }

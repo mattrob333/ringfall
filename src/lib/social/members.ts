@@ -22,7 +22,7 @@
  */
 
 import type { EventCategory, Member, MemberTier } from '@/lib/types';
-import { hashSeed } from './rng';
+import { hashSeed, mulberry32 } from './rng';
 
 /**
  * Compact row form. Expanding eighty full `Member` literals would be 900 lines of
@@ -539,9 +539,346 @@ const ROWS: readonly Row[] = [
   ],
 ] as const;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// The dossier
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * `Member` plus everything a profile needs to read as a person rather than a
+ * row.
+ *
+ * These fields live here rather than in `lib/types.ts` on purpose: that file is
+ * the frozen contract every subsystem shares, and none of them — the globe, the
+ * buzz engine, the charter model — has any business knowing what languages
+ * somebody speaks. `MemberDossier` extends `Member`, so anything typed against
+ * `Member` keeps working unchanged and anything that wants the profile asks for
+ * the dossier.
+ *
+ * Every field is optional. A real member record arriving from a real backend
+ * with nothing but the `Member` core renders correctly; the profile just has
+ * less to say about them.
+ */
+export interface MemberDossier extends Member {
+  /** A real photograph. Absent for the whole simulated roster — see `portrait.ts`. */
+  photoUrl?: string;
+  age?: number;
+  pronouns?: string;
+  languages?: string[];
+  /** Specific. "Runs a Basel gallery", never "entrepreneur". */
+  profession?: string;
+  /** Two or three places they are known to turn up. */
+  signatureSpots?: string[];
+  /** ISO 8601. See the note on `SESSION_ANCHOR` below. */
+  lastSeenAt?: string;
+  tripsThisYear?: number;
+  eventsAttended?: number;
+  /** Who vouched them in: a member handle, or the founding committee. */
+  verifiedBy?: string;
+}
+
+/**
+ * Compact dossier row, keyed by handle:
+ * `[age, pronouns, languages, profession, signature spots]`.
+ *
+ * Languages are comma-separated and spots pipe-separated purely so the table
+ * stays readable as a table. Every line is written to match the bio above it —
+ * the profession is the same fact as the bio, said flat.
+ */
+type Dossier = readonly [
+  age: number,
+  pronouns: string,
+  languages: string,
+  profession: string,
+  spots: string,
+];
+
+const DOSSIERS: Readonly<Record<string, Dossier>> = {
+  // ── Europe ────────────────────────────────────────────────────────────────
+  avroche: [61, 'she/her', 'French, English, Italian',
+    'Directs the family foundation; sits on two museum boards',
+    'Basel, the Tuesday preview|Salle Favart, first night|Villa Medici in June'],
+  tmarchetti: [54, 'he/him', 'Italian, English, German',
+    'Fourth generation of a Como textile house',
+    'Villa d’Este lawn, Saturday|Imola paddock|Bar Basso, after the fair'],
+  cashgrove: [57, 'she/her', 'English, French',
+    'Breeds event horses in Gloucestershire',
+    'Badminton, cross-country day|Hurlingham on a Sunday|Wimbledon, second Wednesday'],
+  klindqvist: [49, 'he/him', 'Swedish, English, German',
+    'Sold the shipyard, kept the drawing office',
+    'Sandhamn, midsummer week|Gothenburg for the Ocean Race stopover|Fiskebäckskil in August'],
+  daubusson: [44, 'she/her', 'French, English, Italian',
+    'Gallerist in Vieux Nice, hours at her discretion',
+    'Porto Cervo in September|Les Voiles de Saint-Tropez|Antibes market, early'],
+  areiswitz: [46, 'he/him', 'German, English, Italian',
+    'Supplies brake and cooling parts to half the grid',
+    'Spa, the bank above Eau Rouge|Kitzbühel, Hahnenkamm Saturday|Goodwood paddock'],
+  ivandoorne: [52, 'she/her', 'Dutch, English, German',
+    'Buys buildings other developers have written off',
+    'Salone, the Rho halls at nine|Zeeland regatta week|PAN Amsterdam'],
+  lbaccarini: [41, 'he/him', 'Italian, English',
+    'Runs a restaurant group across Rome, Milan and Palermo',
+    'Testaccio market before six|Noto in August|The Rome opera gala'],
+  dalmeidaserra: [55, 'he/him', 'Portuguese, English, French, Spanish',
+    'Cork, then solar, now largely the boat',
+    'Cascais, the start line|Comporta in September|Alentejo harvest dinners'],
+  fetxeberria: [63, 'he/him', 'Spanish, Basque, English',
+    'Bought a links course to keep it a links course',
+    'Valderrama in October|San Sebastián, Gastronomika week|Jerez for the historics'],
+  sberthierkwon: [58, 'she/her', 'French, English, Korean',
+    'Fifth-generation private bank; runs the Geneva book',
+    'Verbier in March|Basel, collectors’ preview|Bürgenstock, two weeks in August'],
+  rkozlowska: [47, 'she/her', 'Polish, German, English, Italian',
+    'Prices catastrophe risk for a reinsurer',
+    'Design Miami/Basel|Bad Ragaz, the same suite|Venice in the odd years'],
+  imarquardt: [60, 'she/her', 'German, French, English',
+    'Fourth generation between a stud farm and a ski lift',
+    'Gstaad, the polo weekend|Aachen in July|Saanen ramp on New Year’s Eve'],
+  etremaux: [36, 'she/her', 'French, English, Italian',
+    'Runs the guiding outfit she used to work for',
+    'Courchevel 1850, first lift|La Grave in April|Chamonix for the Kandahar'],
+  cdragoi: [59, 'he/him', 'Romanian, German, English, French',
+    'Underwrites two opera houses and argues with both',
+    'Salzburg, the Felsenreitschule|The Vienna Opera Ball|Bayreuth, when he loses'],
+  hbruun: [51, 'he/him', 'Danish, English, German',
+    'Furniture, then hotels, now a small foundry',
+    '3 Days of Design, Frederiksstaden|Skagen in July|Copenhagen, vegetable season'],
+  bhalvorsen: [45, 'she/her', 'Norwegian, English, German',
+    'Develops offshore wind — sites them, does not run them',
+    'Hardangervidda in August, alone|Hemsedal midweek|Ålesund for the fjord regatta'],
+  khalberg: [43, 'he/him', 'Finnish, Swedish, English, Russian',
+    'Icebreaker contracts, and a glass house nobody can find',
+    'Kilpisjärvi in February|Helsinki Design Week|The Åland archipelago in July'],
+  zkarnowska: [39, 'she/her', 'Polish, English, German',
+    'Runs a logistics group; holds the interwar poster archive',
+    'Warsaw Gallery Weekend|Kraków, the Sukiennice in winter|Sopot in August'],
+  jbokonjo: [50, 'he/him', 'French, English, Lingala, Dutch',
+    'Commodities lawyer; lends Congolese modernism to anyone who asks properly',
+    'Bozar openings|Art Brussels, Thursday|Kinshasa in December'],
+  ebalogunreid: [42, 'he/him', 'English, Yoruba, French',
+    'Two record labels and a minority stake in a stadium',
+    'Notting Hill, the Sunday|Wimbledon, second Friday|Lagos in December'],
+  afbyrne: [48, 'she/her', 'English, Irish, Russian',
+    'Runs a thoroughbred stud in Kildare',
+    'Punchestown, festival week|Ballybunion in September|The Curragh on a Saturday'],
+  nrahimivoss: [38, 'she/her', 'German, English, Farsi',
+    'Composes film scores; keeps a Steinway in a former substation',
+    'Berlinale, the eight a.m. screenings|Donaueschingen|Sylt in October'],
+  gpetrossian: [64, 'he/him', 'Greek, Armenian, English, French',
+    'Third-generation shipping, dry bulk and tankers',
+    'The Tip berth, Monaco|Porto Cervo, Rolex week|Frieze Masters'],
+  msalvarezza: [37, 'he/him', 'Italian, Spanish, English',
+    'Two clubs and a vineyard that worries him',
+    'Formentera, Sunday lunch|Cala d’Hort at sunset|Milan, Salone week'],
+  nbencherif: [40, 'she/her', 'French, Arabic, English',
+    'Finances first features from a flat above the Croisette',
+    'Cannes, the Palais at eight|Marrakech film week|The Lido in September'],
+  nachebelaurent: [43, 'she/her', 'French, English, Igbo',
+    'Buys couture archives before the houses value them',
+    'Paris, the Wednesday shows|Palais Galliera openings|Lagos, Arise week'],
+  ykarahan: [56, 'he/him', 'Turkish, English, French',
+    'Fourth-generation carpet house, now an auction consultancy',
+    'The Grand Bazaar before it opens|Istanbul Biennial|Bodrum in June'],
+
+  // ── Gulf & Levant ─────────────────────────────────────────────────────────
+  sbinghurair: [59, 'he/him', 'Arabic, English, French',
+    'Runs a ports group; takes the endurance stable more seriously',
+    'Dubai World Cup|The Bouthib endurance course|Yas, the Saturday'],
+  zoduya: [41, 'she/her', 'Arabic, English, French',
+    'Sovereign-fund alumna, now advises private collections',
+    'Abu Dhabi Art|Basel, the Tuesday|Aachen in July'],
+  yhaddadin: [44, 'she/her', 'Arabic, English, French',
+    'Built a museum wing and a fashion week in the same year',
+    'M7 openings, Msheireb|Paris couture week|Al Zubarah at dawn'],
+  balmuqrin: [47, 'he/him', 'Arabic, English',
+    'Family industrials; a workshop of half-finished rally cars',
+    'Jeddah, the Corniche circuit|Deauville sales|Diriyah in January'],
+  maldossari: [35, 'she/her', 'Arabic, English, French',
+    'Third generation in shipping insurance',
+    'Paris, the archive sales|Basel in June|Milan, Via Gesù'],
+  ralfalasi: [29, 'he/him', 'Arabic, English',
+    'Owns the kart circuit he bought at nineteen',
+    'Sakhir, night practice|Spa in August|Doha, the late dinners'],
+  relkassab: [52, 'she/her', 'Arabic, French, English',
+    'Publishes twelve titles a year, half of them poetry',
+    'Beirut Art Fair|Batroun in August|The Left Bank in October'],
+  dshternberg: [46, 'he/him', 'Hebrew, English, Russian',
+    'Sold the second company, still runs the first',
+    'Machane Yehuda on a Friday|The Galilee in April|Copenhagen, when the table comes up'],
+  lsarraf: [33, 'she/her', 'Arabic, English',
+    'Holds the diving concessions on two Red Sea reefs',
+    'The Farasan Banks in March|AlUla in winter|Hurghada crossings'],
+
+  // ── Africa ────────────────────────────────────────────────────────────────
+  moyelaran: [45, 'he/him', 'English, Yoruba, French',
+    'Two record labels and the printing house he mentions first',
+    'Lagos in December|Accra, the studio sessions|Paris, the Afro-house week'],
+  cnwokolo: [38, 'he/him', 'English, Twi, Igbo',
+    'Telecoms towers, then a film fund that backs one picture a year',
+    'Chale Wote, Jamestown|Cannes, the market|Lagos in December'],
+  iwanjiru: [53, 'he/him', 'Swahili, English, Maa',
+    'Runs three conservancies and the lodges that pay for them',
+    'Laikipia in the long rains|Lamu in November|Lewa, on foot'],
+  amwangi: [44, 'she/her', 'English, Swahili, Afrikaans, Danish',
+    'Vineyards in Stellenbosch; funds a marine reserve',
+    'Stellenbosch at harvest|De Hoop in whale season|Hermanus in August'],
+  tmokoena: [49, 'he/him', 'English, Sesotho, Zulu',
+    'Platinum, then private credit',
+    'Leopard Creek in December|Sun City, Nedbank week|Franschhoek in March'],
+  otazi: [51, 'he/him', 'Arabic, French, English, Tamazight',
+    'Restored four riads and sold three',
+    'Marrakech, the Thursday souk|Essaouira, Gnaoua week|Fez medina in spring'],
+  asesaygrant: [36, 'she/her', 'English, French, Kinyarwanda',
+    'Coffee estates, and a design residency above them',
+    'Nyungwe in the dry season|Kigali, Ubumuntu week|Lake Kivu in July'],
+  fboulahya: [40, 'she/her', 'Arabic, French, English',
+    'Phosphates by inheritance, contemporary ceramics by choice',
+    '1-54 in Marrakech|The Left Bank galleries|Tangier in September'],
+
+  // ── Asia ──────────────────────────────────────────────────────────────────
+  hfujisawa: [55, 'she/her', 'Japanese, English, Spanish',
+    'Owns the buildings two Michelin kitchens sit in',
+    'The outer market at five|Kyoto in November|Naoshima, off season'],
+  smbaek: [42, 'he/him', 'Korean, English, Japanese',
+    'Produces four features a year and finishes two',
+    'Busan, opening weekend|Seongsu-dong, late|Cannes, the market'],
+  whliao: [39, 'she/her', 'Mandarin, English, Japanese',
+    'Semiconductors on the family side, a tea house on hers',
+    'Alishan, first flush|Taipei Dangdai|Kyoto in April'],
+  htanabe: [57, 'he/him', 'English, Japanese, Cantonese, Mandarin',
+    'Ran an auction house, now his own advisory',
+    'Basel Hong Kong, the Tuesday|Kyoto in November|Sai Kung on Sundays'],
+  mlostrowska: [46, 'she/her', 'Mandarin, English, Polish',
+    'Built a department store that refuses to stock anything seasonal',
+    'West Bund, opening week|Paris in March|Suzhou gardens in the rain'],
+  svorapatr: [48, 'she/her', 'Thai, English, French',
+    'Six hospitality properties, all of them complained about in writing',
+    'Chiang Rai in the cool season|Bangkok, Chinatown after ten|Koh Yao Noi'],
+  smistry: [54, 'he/him', 'English, Hindi, Gujarati, Malay',
+    'Ran a family office, now runs a golf calendar',
+    'Sentosa, the Thursday pro-am|St Andrews in October|Melbourne, sandbelt week'],
+  nrsarnaik: [50, 'he/him', 'Marathi, Hindi, English',
+    'Second-generation infrastructure — ports and toll roads',
+    'Buddh, Friday practice|Wimbledon, first week|Alibaug at the weekend'],
+  vchandra: [58, 'he/him', 'Tamil, Hindi, English',
+    'Textiles, then a private museum in Jaipur',
+    'Jaipur, the literature week|The Rajasthan polo season|Chennai in December'],
+  panandavelu: [37, 'she/her', 'Kannada, Tamil, English',
+    'Two exits; now funds an ashram she finds ridiculous',
+    'Coorg in March|The north end of Goa, off season|Rishikesh in October'],
+  rbneve: [41, 'he/him', 'Sinhala, English, Bengali, Dutch',
+    'Tea estates, and a dive operation off Trincomalee',
+    'Trincomalee, blue whale season|Galle Fort in January|The Baa atoll'],
+  jwruan: [52, 'he/him', 'Mandarin, English',
+    'Private equity by day, Song ceramics by night',
+    'The Poly autumn sales|Mission Hills in November|Kyoto, the temple auctions'],
+  naitmatov: [44, 'he/him', 'Kazakh, Russian, English',
+    'Mining, and eight years of making the Tien Shan a ski destination',
+    'Shymbulak in January|Charyn in May|Verbier, to see how it is done'],
+  aprawiro: [47, 'he/him', 'Indonesian, English, Dutch',
+    'Palm oil in the past tense, marine conservation in the present',
+    'Raja Ampat in October|The Bukit at dawn|Komodo crossings'],
+
+  // ── The Americas ──────────────────────────────────────────────────────────
+  lthornebaptiste: [56, 'she/her', 'English, French',
+    'Advises three collections and owns a fourth she never mentions',
+    'Frieze, the Wednesday|Basel, collectors’ preview|The Costume Institute dinner'],
+  rtuckerman: [62, 'she/her', 'English, Spanish',
+    'Fourth-generation Florida; runs a tennis foundation',
+    'The Open, first Tuesday|Seminole, in season|Newport in July'],
+  jwendover: [48, 'he/him', 'English',
+    'Turned a timber business into land trusts',
+    'Highland Bowl, first tram|Park City, the documentary side|Baja in March'],
+  esandoval: [45, 'he/him', 'English, Spanish',
+    'Financed a studio, then a hot-spring hotel in Baja',
+    'Telluride over Labor Day|Todos Santos in winter|Ojai on Sundays'],
+  lhavardcheng: [43, 'they/them', 'English, French, Mandarin',
+    'Built two hardware companies; now funds supply-chain documentaries',
+    'Sundance, the documentary strand|Big Sur midweek|Milan in April'],
+  gpenaranda: [39, 'he/him', 'Spanish, English, Portuguese',
+    'Music publishing, and a marina he bought by accident',
+    'Miami, race week|Cartagena in January|Ibiza in September'],
+  trivera: [51, 'he/him', 'English, Spanish',
+    'Midstream energy; owns a barbecue institution he runs badly',
+    'Austin, the Friday of the race|Lockhart before noon|Cabo in February'],
+  hvosburgh: [53, 'she/her', 'English',
+    'Puts ranch land into conservation easements',
+    'The elk refuge in January|Teton Pass at first light|The Rock Springs sales'],
+  prkruger: [46, 'he/him', 'English, Afrikaans, French',
+    'Forestry money into film infrastructure',
+    'Bella Coola in April|Toronto, the first weekend|Whistler midweek'],
+  aokorolambert: [34, 'she/her', 'English, French, Igbo',
+    'Runs a pension fund’s private credit desk',
+    'The Toronto Biennial|Lagos in December|Paris Photo'],
+  rquintanilla: [49, 'he/him', 'Spanish, English',
+    'Agave, two restaurants and a film fund, in that order',
+    'Oaxaca in November|Morelia, film week|Valle de Guadalupe at harvest'],
+  xbetancourt: [42, 'she/her', 'Spanish, English, Portuguese',
+    'Took a flower export business into logistics',
+    'Medellín, the flower fair|Cartagena in January|The Llanos, Paso trials'],
+  oferreiralindt: [47, 'he/him', 'Portuguese, English, German',
+    'Sugar and ethanol; sponsored two karting careers, one his own',
+    'Interlagos, race Sunday|Trancoso in January|Rio, the long Sunday lunch'],
+  inakagawa: [36, 'she/her', 'Portuguese, English, Japanese',
+    'Third-generation Japanese-Brazilian, second in coastal shipping',
+    'Angra dos Reis in February|Lapa, the late sets|Búzios, regatta week'],
+  slarranaga: [44, 'she/her', 'Spanish, English, French',
+    'Breeds polo ponies; the wine label pays for them',
+    'Palermo, the Open final|Mendoza at harvest|José Ignacio in January'],
+  possandon: [40, 'she/her', 'Spanish, English',
+    'Copper by family, Patagonia by choice',
+    'Torres del Paine in November|Portillo in August|Chiloé in February'],
+  citurbe: [45, 'he/him', 'Spanish, English, Quechua',
+    'Fishmeal fortune; funds two digs by way of apology',
+    'Barranco, the late tables|Chachapoyas in the dry season|Cusco in June'],
+
+  // ── Oceania ───────────────────────────────────────────────────────────────
+  bruggeri: [43, 'she/her', 'English, Italian',
+    'Property, then a sailing syndicate that eats the profit',
+    'Boxing Day, off the Heads|Hobart, the Customs House dock|Byron midweek'],
+  apemberton: [50, 'he/him', 'English, Māori',
+    'Exports agricultural machinery across the Pacific',
+    'Flemington, spring carnival|Albert Park on the Saturday|The Peninsula in February'],
+  fashcombe: [41, 'she/her', 'English, Māori, Malayalam',
+    'Marine engineer; her yard only builds single-handers',
+    'Waiheke over New Year|Bay of Islands in March|Auckland, the regatta start'],
+  twhitiora: [38, 'he/him', 'English, Māori',
+    'Runs a heli operation and a four-room lodge',
+    'The Remarkables at first light|Fiordland in March|Wanaka, the shoulder weeks'],
+};
+
+/**
+ * `lastSeenAt` is the one field here that is a function of the wall clock, and
+ * it is computed once at module evaluation rather than per read.
+ *
+ * The offset itself is hashed from the handle, so the *ordering* of who was
+ * around most recently never changes; only the anchor moves. Nothing rendered
+ * during SSR reads it — presence only appears inside the profile sheet, which
+ * is mounted by a click — so it cannot produce a hydration mismatch, and it
+ * means a member is never "last seen 400 days ago" because the file is old.
+ */
+const SESSION_ANCHOR = Date.now();
+
 const idFor = (handle: string): string => `m-${handle}`;
 
-function expand(row: Row): Member {
+/** Founding members are the pool everyone else was vouched in from. */
+const FOUNDING_HANDLES: readonly string[] = ROWS.filter((r) => r[7] === 'founding').map(
+  (r) => r[1],
+);
+
+/**
+ * Membership by referral is the entire texture of a club like this, so it is
+ * modelled rather than decorated: founding members came in with the house, and
+ * everybody else has a name attached to them. Derived from the handle so the
+ * chain is stable and always points at somebody who actually exists.
+ */
+function vouchedBy(handle: string, tier: MemberTier): string {
+  if (tier === 'founding') return 'Founding committee';
+  const pool = FOUNDING_HANDLES.filter((h) => h !== handle);
+  const pick = pool[hashSeed(`vouch:${handle}`) % pool.length];
+  return pick ? `@${pick}` : 'Founding committee';
+}
+
+function expand(row: Row): MemberDossier {
   const [
     name,
     handle,
@@ -563,6 +900,24 @@ function expand(row: Row): Member {
   // some have not sat for it. Derived from the handle so it never changes.
   const verified = tier !== 'charter' || hashSeed(`verify:${handle}`) % 3 !== 0;
 
+  const dossier = DOSSIERS[handle];
+  const rand = mulberry32(hashSeed(`dossier:${handle}`));
+
+  // How much they actually move. Owning the metal roughly doubles it, and rank
+  // correlates because the people who have been here longest go to more.
+  const tierLift = tier === 'founding' ? 1.35 : tier === 'signature' ? 1 : 0.72;
+  const tripsThisYear = Math.max(
+    1,
+    Math.round((2 + rand() * 7) * tierLift * (aircraft ? 1.45 : 1)),
+  );
+
+  // A running total since intake, at a plausible rate per year.
+  const years = Math.max(0.5, (Date.parse('2026-07-26') - Date.parse(since)) / 31_557_600_000);
+  const eventsAttended = Math.round(years * (3 + rand() * 6) * tierLift) + 2;
+
+  // Presence: most of the club has been in this week, a long tail has not.
+  const hoursAgo = Math.round(Math.pow(rand(), 2.4) * 640) + 1;
+
   return {
     id: idFor(handle),
     handle,
@@ -576,27 +931,47 @@ function expand(row: Row): Member {
     interests: [...interests],
     openToJetShare,
     ...(aircraft ? { aircraft } : {}),
+    ...(dossier
+      ? {
+          age: dossier[0],
+          pronouns: dossier[1],
+          languages: dossier[2].split(',').map((s) => s.trim()),
+          profession: dossier[3],
+          signatureSpots: dossier[4].split('|').map((s) => s.trim()),
+        }
+      : {}),
+    tripsThisYear,
+    eventsAttended,
+    lastSeenAt: new Date(SESSION_ANCHOR - hoursAgo * 3_600_000).toISOString(),
+    verifiedBy: vouchedBy(handle, tier),
   };
 }
 
 /** The full roster. Order is stable and is the tie-break for every sort. */
-export const MEMBERS: readonly Member[] = ROWS.map(expand);
+export const MEMBERS: readonly MemberDossier[] = ROWS.map(expand);
 
 /** `id` → `Member`. The only sanctioned way to resolve a member reference. */
-export const MEMBER_INDEX: ReadonlyMap<string, Member> = new Map(
+export const MEMBER_INDEX: ReadonlyMap<string, MemberDossier> = new Map(
   MEMBERS.map((m) => [m.id, m]),
 );
 
 /** `handle` → `Member`, for @-mention style lookups. */
-export const MEMBER_BY_HANDLE: ReadonlyMap<string, Member> = new Map(
+export const MEMBER_BY_HANDLE: ReadonlyMap<string, MemberDossier> = new Map(
   MEMBERS.map((m) => [m.handle, m]),
 );
 
 /** Never throws — returns `undefined` for an unknown id, callers decide. */
-export const getMember = (id: string): Member | undefined => MEMBER_INDEX.get(id);
+export const getMember = (id: string): MemberDossier | undefined => MEMBER_INDEX.get(id);
+
+/**
+ * Resolve a `verifiedBy` value back to a member. Returns `undefined` for the
+ * founding committee, which is a body rather than a person.
+ */
+export const resolveVoucher = (verifiedBy: string | undefined): MemberDossier | undefined =>
+  verifiedBy?.startsWith('@') ? MEMBER_BY_HANDLE.get(verifiedBy.slice(1)) : undefined;
 
 /** Members who own an aircraft and will put strangers in the back of it. */
-export const JET_OWNERS: readonly Member[] = MEMBERS.filter(
+export const JET_OWNERS: readonly MemberDossier[] = MEMBERS.filter(
   (m) => Boolean(m.aircraft) && m.openToJetShare,
 );
 
@@ -605,7 +980,7 @@ export const JET_OWNERS: readonly Member[] = MEMBERS.filter(
  * base, editable in the profile sheet, and never a peer of themselves.
  * `useSocialStore` seeds from this and persists any edits.
  */
-export const YOU: Member = {
+export const YOU: MemberDossier = {
   id: 'me',
   handle: 'you',
   name: 'You',

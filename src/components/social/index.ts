@@ -14,6 +14,19 @@ export type { PeerStackProps } from './PeerStack';
 export { GroupList } from './GroupList';
 export type { GroupListProps } from './GroupList';
 
+// ── The cabin, opened ───────────────────────────────────────────────────────
+export { GroupCard } from './GroupCard';
+export type { GroupCardProps } from './GroupCard';
+
+export { GroupChat, useThread, useUnreadFor } from './GroupChat';
+export type { GroupChatProps } from './GroupChat';
+
+export { GroupRoster } from './GroupRoster';
+export type { GroupRosterProps } from './GroupRoster';
+
+export { TypingDots } from './TypingDots';
+export type { TypingDotsProps } from './TypingDots';
+
 export { CharterPanel } from './CharterPanel';
 export type { CharterPanelProps } from './CharterPanel';
 
