@@ -307,7 +307,7 @@ export const GALA_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3000, max: 12000, currency: 'USD' },
     accessNote:
       'Tickets go on sale to the public on 11 January 2027 direct from the Vienna Philharmonic, starting around €220, and the boxes and Golden Hall tables sell first; it is genuinely buyable, unlike the Opera Ball boxes, but only if you are ready on the release date',
-    bookingLeadDays: 10,
+    bookingLeadDays: 180,
     venues: ['Musikverein', 'Golden Hall', 'Brahms-Saal'],
     nearestJetPort: LOWW,
     description:
@@ -387,7 +387,6 @@ export const GALA_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 25000, currency: 'USD' },
     accessNote:
       'There is no ticket sale — the room is filled by Fashion Trust Arabia\'s board, its jury, the shortlisted designers and invited press; access runs through the organisation\'s patron network or a participating house, and invitations go out roughly two months ahead',
-    bookingLeadDays: 60,
     venues: ['National Museum of Qatar', 'M7 Doha'],
     nearestJetPort: OTHH,
     description:

@@ -39,6 +39,7 @@ export const TENNIS_EVENTS: WorldEvent[] = [
     tier: 'marquee',
     priceIndex: 3,
     estimatedSpend: { min: 4000, max: 22000, currency: 'USD' },
+    bookingLeadDays: 365,
     accessNote:
       'Three-day ticket packages go on sale roughly a year ahead and single sessions later; the courtside Laver Cup Club and the player-bench-adjacent seats are sold as hospitality through the event, and they clear first',
     venues: ['The O2 Arena'],
@@ -158,6 +159,7 @@ export const TENNIS_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 34000, currency: 'USD' },
     accessNote:
       'Grounds and stadium series tickets go on sale the previous autumn and first-week sessions stay available; the Nowhere and Chairman’s boxes at Stadium 1 are held by long-term subscribers, and Coachella Valley rentals for March book by December',
+    bookingLeadDays: 150,
     venues: ['Indian Wells Tennis Garden', 'Stadium 1', 'Stadium 2'],
     nearestJetPort: KTRM,
     description:
@@ -316,6 +318,7 @@ export const TENNIS_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4000, max: 20000, currency: 'USD' },
     accessNote:
       'The Hurlingham Club’s own members get first call; the remainder goes as corporate hospitality tables through a small number of licensed agents, and there is no general public sale at any point',
+    bookingLeadDays: 150,
     venues: ['The Hurlingham Club, Fulham'],
     nearestJetPort: EGLF,
     description:
@@ -354,6 +357,7 @@ export const TENNIS_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 10000, max: 70000, currency: 'USD' },
     accessNote:
       'The public ballot is a genuine lottery entered by the previous December; Centre Court and No.1 Court Debentures are five-year instruments that trade freely on the secondary market and are the only reliable way in for a specific day',
+    bookingLeadDays: 450,
     venues: ['Centre Court', 'No.1 Court', 'All England Lawn Tennis Club'],
     nearestJetPort: EGLF,
     description:
@@ -392,6 +396,7 @@ export const TENNIS_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 8000, max: 48000, currency: 'USD' },
     accessNote:
       'General sale opens in the summer and first-week grounds passes stay available; Arthur Ashe loge and suite inventory is held by long-term licence holders and reaches the market only through resale, which spikes for the second-week night sessions',
+    bookingLeadDays: 300,
     venues: [
       'Arthur Ashe Stadium',
       'Louis Armstrong Stadium',

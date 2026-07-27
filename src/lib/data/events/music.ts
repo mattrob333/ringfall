@@ -49,7 +49,7 @@ export const MUSIC_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6500, max: 28000, currency: 'USD' },
     accessNote:
       'Passes sell in a January advance sale and again in a January general sale, both minutes long; the practical route is a Safari or Lake Eldorado on-site package, or a brand guest list secured through a talent agency by February',
-    bookingLeadDays: 90,
+    bookingLeadDays: 180,
     venues: ['Empire Polo Club', 'Coachella Stage', 'Sahara Tent', 'Yuma'],
     nearestJetPort: KTRM,
     description:
@@ -89,7 +89,7 @@ export const MUSIC_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5500, max: 24000, currency: 'USD' },
     accessNote:
       'Weekend two passes stay available for weeks after weekend one sells out, and resale softens sharply once the first weekend ends; villa rentals in Palm Springs are materially cheaper for these three nights',
-    bookingLeadDays: 60,
+    bookingLeadDays: 150,
     venues: ['Empire Polo Club', 'Coachella Stage', 'Sahara Tent', 'Outdoor Theatre'],
     nearestJetPort: KTRM,
     description:

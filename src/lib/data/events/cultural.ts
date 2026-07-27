@@ -326,7 +326,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 10000, max: 40000, currency: 'USD' },
     accessNote:
       'Camarote boxes at the Sambadrome are sold as hospitality packages from October — Camarote Nº1 and the Rio Samba Concept are the two that matter; a costume slot inside a school’s wing is bought directly from the quadra and rehearsed',
-    bookingLeadDays: 365,
+    bookingLeadDays: 180,
     venues: [
       'Sambódromo Marquês de Sapucaí',
       'Cidade do Samba',

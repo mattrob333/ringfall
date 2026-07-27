@@ -549,7 +549,7 @@ export const SKI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 28000, currency: 'USD' },
     accessNote:
       'Riding is through the St. Moritz Tobogganing Club; beginners take the compulsory morning instruction from Junction, and Supplementary List riders do not need to pre-book for the 2026/27 season',
-    bookingLeadDays: 60,
+    bookingLeadDays: 150,
     venues: ['Cresta Run', 'St. Moritz Tobogganing Club', 'Kulm Country Club'],
     nearestJetPort: LSZS,
     description:

@@ -80,6 +80,7 @@ export const GOLF_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5000, max: 20000, currency: 'USD' },
     accessNote:
       'The field is invited by Pine Valley Golf Club and nothing is sold; spectating is by member introduction only, and the club does not admit the public at any point during the tournament',
+    bookingLeadDays: 120,
     venues: ['Pine Valley Golf Club'],
     nearestJetPort: KTEB,
     description:
@@ -160,6 +161,7 @@ export const GOLF_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4000, max: 18000, currency: 'USD' },
     accessNote:
       'Grounds tickets are sold in Japan through convenience-store terminals and at the gate and rarely sell out; the Sheraton Grande Ocean Resort on site takes the entire international contingent and books out by September',
+    bookingLeadDays: 90,
     venues: ['Phoenix Country Club', 'Phoenix Seagaia Resort'],
     nearestJetPort: RJFF,
     description:
@@ -201,6 +203,7 @@ export const GOLF_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 35000, currency: 'USD' },
     accessNote:
       'General admission has historically been free or nominal and is genuinely open; the Championship Club and the on-course villas on 18 are sold as corporate packages from the previous autumn through Dubai Golf',
+    bookingLeadDays: 120,
     venues: ['Emirates Golf Club, Majlis Course'],
     nearestJetPort: OMDW,
     description:
@@ -315,6 +318,7 @@ export const GOLF_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 10000, max: 60000, currency: 'USD' },
     accessNote:
       'USGA tickets are distributed by random selection from a registration list opened well over a year out; the Trophy Club and 1895 Club hospitality sell direct, and Lodge and Inn rooms at Pebble Beach are committed to championship packages',
+    bookingLeadDays: 450,
     venues: ['Pebble Beach Golf Links'],
     nearestJetPort: KMRY,
     description:
@@ -353,6 +357,7 @@ export const GOLF_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 9000, max: 55000, currency: 'USD' },
     accessNote:
       'The R&A runs a public ballot that opens the previous autumn and is heavily oversubscribed for a St Andrews year; One Club hospitality and the Championship debentures sell separately, and Fife and Edinburgh houses are let from eighteen months out',
+    bookingLeadDays: 540,
     venues: ['Old Course, St Andrews', 'Royal and Ancient Golf Club'],
     nearestJetPort: EGPN,
     description:
@@ -391,6 +396,7 @@ export const GOLF_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 18000, max: 100000, currency: 'USD' },
     accessNote:
       'Tickets are allocated by ballot registered years ahead and are non-transferable; hospitality packages through Ryder Cup Europe are the reliable route in, and every hotel and country house within an hour of Adare was contracted long ago',
+    bookingLeadDays: 730,
     venues: ['Adare Manor'],
     nearestJetPort: EINN,
     description:

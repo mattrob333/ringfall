@@ -166,8 +166,13 @@ export const CATEGORY_LEAD_DAYS: Record<EventCategory, number> = {
   /** 1 month. See the inversion note in the file header: this is short because
    *  the reservation line for a three-star opens at a fixed ~30-day horizon and
    *  clears in seconds, not because the table is easy. Earlier is impossible;
-   *  later is too late. Harvest-bound trips (truffle, vendange) sit at the same
-   *  horizon for a different reason — the date itself is not known much sooner. */
+   *  later is too late.
+   *
+   *  Harvest-bound trips are the documented exception and carry an explicit
+   *  override rather than this default. The table is a 30-day problem, but the
+   *  BED is not: the Barolo and Serralunga houses that make an Alba truffle
+   *  weekend worth doing are gone by August for an October harvest. Where the
+   *  scarce thing is the room rather than the reservation, the event says so. */
   culinary: 30,
 };
 
@@ -183,32 +188,32 @@ export const CATEGORY_LEAD_DAYS: Record<EventCategory, number> = {
  */
 export const LEAD_TIME_NOTES: Record<EventCategory, string> = {
   safari:
-    'The six-bed camps on the river and the best Sabi Sand lodges are rebooked by returning guests as they check out.',
+    'The small camps are rebooked by returning guests as they check out, so the beds are gone before the season is announced.',
   nature:
-    'Antarctic berths, permits capped by daily quota, and migration windows measured in weeks — all rationed a year ahead.',
-  golf: 'The Masters ballot opens and closes ten months out, and Ryder Cup hospitality is sold before the team is known.',
-  ski: 'The chalets that matter for New Year are re-let to last season’s family before the snow arrives.',
+    'Berths, permits and guides are rationed by quota rather than price, and the window itself is only weeks wide.',
+  golf: 'Ballots register the better part of a year out, and on-course hospitality is sold before the field is known.',
+  ski: 'The chalets that matter are re-let to last season’s family before the snow arrives.',
   tennis:
-    'Debentures trade as securities rather than tickets, and the Wimbledon ballot closes the autumn before.',
+    'The good seats are held on long licences and reach the market only through resale, if at all.',
   cultural:
-    'Palio window seats belong to Sienese families, and the good Oktoberfest tents open their books in spring.',
-  film: 'Cannes, Telluride and the Lido are small towns; the rooms are contracted before the line-up is announced.',
-  gala: 'The Opera Ball ballot registers eight months out, and the tables that matter are held by last year’s hosts.',
+    'The vantage points belong to local families and the rooms overlooking them are let by arrangement, not by booking.',
+  film: 'The good rooms are contracted before the line-up is even announced; accreditation is the easy half.',
+  gala: 'Tables are held by last year’s hosts, and a first invitation is a relationship rather than a purchase.',
   sailing:
-    'A specific hull for a specific week — the charter fleet and the Mediterranean berths are committed before the season opens.',
+    'A specific hull for a specific week: the charter fleet and the berths are committed before the season opens.',
   equestrian:
-    'The Royal Enclosure needs a sponsor and a winter application; the boxes are renewed by the people already in them.',
+    'Enclosure access needs a sponsor and a winter application, and the boxes renew to the people already in them.',
   music:
-    'Salzburg, Glyndebourne, Bayreuth and Glastonbury open on a published date and clear in a single morning.',
+    'The best of it goes on a published date and clears in a single morning; the beds nearby go earlier still.',
   wellness:
-    'The clinics that work run intakes rather than bookings, and January is full by midsummer.',
-  art: 'The fair is the easy part — Basel, Maastricht and Venice do not have enough beds, and never will.',
+    'The clinics that work run intakes rather than bookings, and the winter programmes fill by midsummer.',
+  art: 'The fair is the easy part — the host city does not have enough beds, and never will.',
   motorsport:
-    'Monaco terraces, Port Hercule berths and Goodwood hospitality: the view is finite even where the grandstand is not.',
+    'The view is finite even where the grandstand is not: terraces, berths and hospitality are all fixed inventory.',
   design:
-    'Salone puts three hundred thousand people into Milan for one week, and the city clears long before the stands go up.',
+    'A design week puts a year of visitors into one city in seven days, and it clears long before the stands go up.',
   fashion:
-    'The seat cannot be bought at any horizon; the Paris hotel room and the car and driver can, but not late.',
+    'The seat cannot be bought at any horizon; the hotel room and the car and driver can, but not late.',
   culinary:
     'Inverted — the three-star line opens about thirty days out and clears in seconds. Earlier is impossible, later is too late.',
 };

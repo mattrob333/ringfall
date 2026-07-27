@@ -259,7 +259,6 @@ export const FASHION_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 7000, max: 18000, currency: 'USD' },
     accessNote:
       'Seats are issued house by house; a client director at Michael Kors, Carolina Herrera, Ralph Lauren or Khaite is the only dependable route, and requests should be in by early January',
-    bookingLeadDays: 45,
     venues: ['Starrett-Lehigh Building', 'Spring Studios', 'off-schedule downtown venues'],
     description:
       'The autumn/winter round is the smaller and more workmanlike of New York’s two weeks, and the one where the American houses show tailoring and outerwear rather than resort. Ralph Lauren typically shows off-schedule at his own venue, which is the ticket everyone actually wants. February in New York means the parties happen indoors and the schedule holds.',
@@ -374,7 +373,6 @@ export const FASHION_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 15000, max: 40000, currency: 'USD' },
     accessNote:
       'Invitation only through your maison’s client director; the July week is smaller than January, so seats are held almost entirely for clients placing orders that season',
-    bookingLeadDays: 45,
     venues: ['Grand Palais', 'Musée Rodin', 'Place Vendôme salons', 'maison ateliers'],
     description:
       'The July couture round is where the ateliers show the most labour-intensive work of the year — embroidery and construction that can run to thousands of hours per garment. It is smaller and quieter than January, with Paris half-emptied for the summer, which makes the salon appointments afterwards considerably easier to get time in. Orders placed this week are delivered ahead of the autumn.',
