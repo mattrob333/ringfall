@@ -43,6 +43,7 @@ export const NATURE_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 22000, max: 70000, currency: 'USD' },
     accessNote:
       'Antarctic charter berths on the small expedition ships go by returning-guest right of first refusal each March; November departures clear that list soonest because the pack ice makes the itinerary least predictable',
+    bookingLeadDays: 240,
     venues: ['Antarctic Peninsula', 'Paradise Bay', 'Neko Harbour', 'Gerlache Strait'],
     nearestJetPort: SAWH,
     description:
@@ -81,6 +82,7 @@ export const NATURE_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 34000, max: 120000, currency: 'USD' },
     accessNote:
       'The owner’s suites on the six ships that matter are held for returning guests and released in a single March window; the January departures are the ones that never reach open sale',
+    bookingLeadDays: 450,
     venues: ['Lemaire Channel', 'Petermann Island', 'Port Lockroy', 'Weddell Sea'],
     nearestJetPort: SCCI,
     description:
@@ -119,6 +121,7 @@ export const NATURE_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4000, max: 16000, currency: 'USD' },
     accessNote:
       'Tromsø is the most open aurora destination there is — hotels, chase minibuses and private guides all sell online weeks out; what is genuinely scarce is a private guide with his own vehicle who will drive four hours inland to find a hole in the cloud',
+    bookingLeadDays: 60,
     venues: ['Tromsø', 'Kvaløya', 'Lyngen Alps', 'Ersfjordbotn'],
     nearestJetPort: ENTC,
     description:
@@ -157,6 +160,7 @@ export const NATURE_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4500, max: 15000, currency: 'USD' },
     accessNote:
       'The Aurora Sky Station runs from late October to late March and is reached only by chairlift up Njullá; the small lodges around Abisko and Björkliden take the winter weeks early, and Kiruna is the arrival field',
+    bookingLeadDays: 180,
     venues: ['Abisko National Park', 'Aurora Sky Station', 'Lake Torneträsk', 'Mount Njullá'],
     nearestJetPort: ESNK,
     description:
@@ -195,6 +199,7 @@ export const NATURE_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5000, max: 18000, currency: 'USD' },
     accessNote:
       'Caves are located fresh each autumn by the guides who then survey them weekly; access is by super-jeep from Jökulsárlón and no operator will take you in during a warm spell, so a private guide who can move the day is worth more than the lodge',
+    bookingLeadDays: 120,
     venues: ['Breiðamerkurjökull', 'Jökulsárlón glacier lagoon', 'Vatnajökull National Park', 'Skaftafell'],
     nearestJetPort: BIRK,
     description:
@@ -426,6 +431,7 @@ export const NATURE_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 12000, max: 38000, currency: 'USD' },
     accessNote:
       'Hanifaru is a UNESCO core zone: snorkelling only, no scuba, ranger-enforced numbers and a 45-minute rotation, and entry is by permit through a Baa Atoll resort or licensed liveaboard — the two or three resorts inside the atoll control practical access',
+    bookingLeadDays: 150,
     venues: ['Hanifaru Bay', 'Baa Atoll UNESCO Biosphere Reserve', 'Dharavandhoo', 'Hanifaru Falhu'],
     nearestJetPort: VRMM,
     description:
@@ -655,6 +661,7 @@ export const NATURE_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 7000, max: 21000, currency: 'USD' },
     accessNote:
       'Nxai and the Makgadikgadi have a handful of camps and most of the Okavango operators close their green-season inventory entirely, so the pans in January are a specialist booking through the two or three companies that stay open',
+    bookingLeadDays: 180,
     venues: ['Nxai Pan National Park', 'Makgadikgadi Pans', 'Baines’ Baobabs', 'Boteti River'],
     nearestJetPort: FBMN,
     description:

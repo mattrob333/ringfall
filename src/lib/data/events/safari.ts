@@ -45,6 +45,7 @@ export const SAFARI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 14000, max: 42000, currency: 'USD' },
     accessNote:
       'The best Mara conservancy camps sell the August crossing weeks eighteen months ahead; the public reserve is bookable later but crowded',
+    bookingLeadDays: 540,
     venues: [
       'Mara Triangle',
       'Paradise Crossing',
@@ -89,6 +90,7 @@ export const SAFARI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 9000, max: 28000, currency: 'USD' },
     accessNote:
       'October rates fall roughly a third from August and camps release inventory six months out — the trade is that the return crossing date is unpredictable to within a fortnight',
+    bookingLeadDays: 180,
     venues: ['Mara Triangle', 'Serena Crossing', 'Sand River', 'Ngiro-are'],
     nearestJetPort: HKNW,
     description:
@@ -211,6 +213,7 @@ export const SAFARI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 9000, max: 26000, currency: 'USD' },
     accessNote:
       'Uganda Wildlife Authority permits are $800 and must be named three to six months out; the habituation permit at $1,500 buys four hours instead of one and is capped at four people',
+    bookingLeadDays: 180,
     venues: ['Bwindi Impenetrable National Park', 'Buhoma sector', 'Ruhija sector', 'Nkuringo'],
     nearestJetPort: HUEN,
     description:
@@ -250,6 +253,7 @@ export const SAFARI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 15000, max: 44000, currency: 'USD' },
     accessNote:
       'Botswana’s low-volume/high-value policy means each concession carries one camp; exclusive-use of a six-tent camp on a private concession is the standard ultra-premium booking and goes twelve to eighteen months out',
+    bookingLeadDays: 450,
     venues: [
       'Moremi Game Reserve',
       'Chief’s Island',
@@ -489,6 +493,7 @@ export const SAFARI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5000, max: 18000, currency: 'USD' },
     accessNote:
       'Zone allocation is a government lottery run through the Rajasthan forest department and cannot be bought; only the number of drives can be, which is why serious operators book six safaris across three days and accept that two will be in poor zones',
+    bookingLeadDays: 120,
     venues: ['Ranthambore National Park', 'Zone 3 lakes', 'Padam Talao', 'Ranthambore Fort'],
     nearestJetPort: VIJP,
     description:
@@ -528,6 +533,7 @@ export const SAFARI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 7000, max: 22000, currency: 'USD' },
     accessNote:
       'Porto Jofre has a handful of lodges and two floating hotels moored on the river; the flotel cabins for August and September are gone by the previous December and the Transpantaneira road is the only land access',
+    bookingLeadDays: 240,
     venues: ['Porto Jofre', 'Rio Cuiabá', 'Três Irmãos river', 'Encontro das Águas State Park'],
     nearestJetPort: SBCY,
     description:
@@ -567,6 +573,7 @@ export const SAFARI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4500, max: 15000, currency: 'USD' },
     accessNote:
       'Block 1 closes entirely from 1 September to 31 October for maintenance; the private tented camps on the park boundary hold ten tents and control their own gate times, which is the only way to avoid the public jeep queue at dawn',
+    bookingLeadDays: 90,
     venues: ['Yala National Park Block 1', 'Palatupana gate', 'Buttuwa waterhole', 'Kumana plains'],
     nearestJetPort: VCBI,
     description:

@@ -47,6 +47,7 @@ export const MOTORSPORT_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 25000, max: 150000, currency: 'USD' },
     accessNote:
       'Peninsula houses and the Lodge at Pebble Beach are contracted a year ahead; auction previews and marque dinners are invitation-led through RM Sotheby’s, Gooding and Bonhams client teams',
+    bookingLeadDays: 300,
     venues: [
       'WeatherTech Raceway Laguna Seca',
       'Quail Lodge & Golf Club',
@@ -91,6 +92,7 @@ export const MOTORSPORT_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 15000, max: 90000, currency: 'USD' },
     accessNote:
       'General admission sells out months ahead; the Chairman’s and Club d’Elegance packages that put you inside the ropes at dawn are allocated by the Concours office to entrants, sponsors and returning patrons',
+    bookingLeadDays: 270,
     venues: ['Pebble Beach Golf Links, 18th fairway'],
     nearestJetPort: KMRY,
     description:
@@ -206,6 +208,7 @@ export const MOTORSPORT_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 32000, currency: 'USD' },
     accessNote:
       'Grandstand tickets are sold directly and are among the cheapest on the calendar; the Paddock Club and the Senna Tower suites go through F1 Experiences, and Jardins hotels want three-night minimums over the weekend',
+    bookingLeadDays: 90,
     venues: ['Autódromo José Carlos Pace, Interlagos'],
     nearestJetPort: SBSP,
     description:
@@ -324,6 +327,7 @@ export const MOTORSPORT_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 35000, currency: 'USD' },
     accessNote:
       'Stage spectating in the Hautes-Alpes is free and you get there before dawn by car; the ceremonial start on Casino Square and the Automobile Club de Monaco enclosures are member-and-guest, and the Hôtel de Paris fills with the service parks’ principals',
+    bookingLeadDays: 60,
     venues: [
       'Casino Square, Monte-Carlo',
       'Col de Turini',
@@ -483,6 +487,7 @@ export const MOTORSPORT_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 12000, max: 70000, currency: 'USD' },
     accessNote:
       'Saturday at Villa d’Este is for entrants, jury and invited guests of BMW Group Classic only; the public Sunday at neighbouring Villa Erba sells a capped ticket, and Villa d’Este itself is fully committed to the Concorso for the weekend',
+    bookingLeadDays: 240,
     venues: ['Villa d’Este, Cernobbio', 'Villa Erba'],
     nearestJetPort: LIML,
     description:
@@ -522,6 +527,7 @@ export const MOTORSPORT_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 30000, max: 140000, currency: 'USD' },
     accessNote:
       'Terrace apartments on Ste-Dévote and the Rascasse are let by the season through Monaco brokers and released the previous October; harbour berths for race week are contracted a year ahead, and Amber Lounge tables are sold by referral',
+    bookingLeadDays: 270,
     venues: [
       'Circuit de Monaco',
       'Port Hercule',
@@ -610,6 +616,7 @@ export const MOTORSPORT_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 45000, currency: 'USD' },
     accessNote:
       'General admission and campsite tickets go on sale the previous November; the Panoramique and Club Sarthe hospitality units and the Hôtel de France at La Chartre are contracted a year out, and manufacturer guest passes come through the teams',
+    bookingLeadDays: 240,
     venues: ['Circuit de la Sarthe', 'Mulsanne Straight', 'Arnage'],
     nearestJetPort: LFRM,
     description:

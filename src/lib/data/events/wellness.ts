@@ -43,6 +43,7 @@ export const WELLNESS_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 15000, max: 40000, currency: 'USD' },
     accessNote:
       'Lanserhof Tegernsee books roughly ten months out for the January intake; the Chairman\'s programme requires a medical intake call and a diagnostic day before the stay is confirmed',
+    bookingLeadDays: 300,
     venues: ['Lanserhof Tegernsee', 'Gut Steinberg', 'Energy Cuisine restaurant'],
     nearestJetPort: EDMO,
     description:
@@ -119,6 +120,7 @@ export const WELLNESS_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 12000, max: 32000, currency: 'USD' },
     accessNote:
       'Programmes are sold in fixed 7, 14 or 21-night blocks with a medical consultation on day one; October is the strongest month for availability before the winter longevity intakes fill',
+    bookingLeadDays: 120,
     venues: ['SHA Wellness Clinic', 'Sierra Helada Natural Park'],
     nearestJetPort: LEVC,
     description:
@@ -233,6 +235,7 @@ export const WELLNESS_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 7000, max: 20000, currency: 'USD' },
     accessNote:
       'Kalari Kovilakom takes a minimum fourteen-night stay and no walk-ins; the Karkidakam intake is small, alcohol, meat and phones are surrendered on arrival, and the schedule is set by the resident vaidya',
+    bookingLeadDays: 90,
     venues: ['Kalari Kovilakom', 'Kollengode Palace', 'Palakkad district'],
     nearestJetPort: VOCI,
     description:
@@ -271,6 +274,7 @@ export const WELLNESS_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 18000, currency: 'USD' },
     accessNote:
       'Aircraft clear customs at Liberia Guanacaste and continue by road or light twin — Nosara\'s own strip is unpaved and daylight-only; the Harmony Hotel and the Bodhi Tree retreat weeks sell out for the January-to-March dry season by the previous autumn',
+    bookingLeadDays: 120,
     venues: ['Playa Guiones', 'The Harmony Hotel', 'Bodhi Tree Yoga Resort'],
     nearestJetPort: MRLB,
     description:
@@ -385,6 +389,7 @@ export const WELLNESS_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 10000, max: 28000, currency: 'USD' },
     accessNote:
       'Guests clear customs at Dubai and take the two-hour mountain road, a boat from Dibba, or a tandem paraglide off the ridge; the Six Senses wellness screening and sleep programmes are booked as add-ons at reservation, not on arrival',
+    bookingLeadDays: 120,
     venues: ['Six Senses Zighy Bay', 'Musandam Peninsula', 'Sense on the Edge'],
     nearestJetPort: OMDW,
     description:

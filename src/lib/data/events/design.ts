@@ -28,6 +28,7 @@ export const DESIGN_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3500, max: 9000, currency: 'USD' },
     accessNote:
       'Most of the programme is free and unticketed; the Design London trade days and the brand launch dinners in Shoreditch and Brompton run on direct invitation from the showrooms',
+    bookingLeadDays: 45,
     venues: ['Victoria and Albert Museum', 'Brompton Design District', 'Shoreditch Design Triangle', 'Mayfair'],
     description:
       'The twenty-fourth edition spreads across roughly a dozen self-organising design districts, with the V&A hosting the anchor commissions in its galleries and courtyards. It is a festival rather than a fair — the value is in the showroom openings, the launches and the talks rather than in buying off a stand. Nine days is long enough that you can pick two districts and do them properly instead of chasing the map.',
@@ -181,6 +182,7 @@ export const DESIGN_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4000, max: 10000, currency: 'USD' },
     accessNote:
       'Venues are free and open to walk-ins; the opening reception and the designer studio visits are arranged through the DESIGNART office or a Tokyo-based design consultant, requested a month out',
+    bookingLeadDays: 45,
     venues: ['Omotesando', 'Roppongi', 'Shibuya', 'Aoyama showrooms'],
     description:
       'The tenth edition, themed "Hibiki," turns around 100 shops, galleries and showrooms across the Omotesando–Roppongi corridor into exhibition spaces for Japanese and international designers. It is a walking festival rather than a fair — you follow a map through Aoyama backstreets and end up in places you would never otherwise enter. Late autumn in Tokyo is also the best weather of the year for doing it on foot.',
@@ -295,6 +297,7 @@ export const DESIGN_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3000, max: 8000, currency: 'USD' },
     accessNote:
       'Stockholm Furniture Fair at Stockholmsmässan is trade-registered online; the city showroom evenings and the Guest of Honour dinner are invitations from the Swedish brands themselves',
+    bookingLeadDays: 60,
     venues: ['Stockholmsmässan, Älvsjö', 'city showrooms', 'Greenhouse'],
     description:
       'Stockholm Furniture Fair anchors the week at Stockholmsmässan while the brands open their downtown showrooms in the evenings — the fair is where the year’s Scandinavian production is launched. Greenhouse gives floor space to design schools and unsigned independents, and it is a reliable place to see work before it is picked up. February in Stockholm is dark and cold, which is exactly why the showroom evenings work.',
@@ -333,6 +336,7 @@ export const DESIGN_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5000, max: 13000, currency: 'USD' },
     accessNote:
       'Districts are free to walk; the installations that matter — Prada Frames, Alcova, the courtyard commissions in Brera — run timed RSVPs that open roughly a month ahead and fill within days',
+    bookingLeadDays: 180,
     venues: ['Brera Design District', 'Tortona', 'Isola', 'Alcova', '5VIE'],
     description:
       'While Salone runs at Rho, the city itself hosts several thousand installations, showroom openings and brand commissions across half a dozen districts. Alcova, staged each year in a different abandoned building on Milan’s edge, is the one venue people plan around. Milan is at absolute capacity that week — cars are near-useless and everything is done on foot or by tram.',
@@ -371,6 +375,7 @@ export const DESIGN_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6500, max: 16000, currency: 'USD' },
     accessNote:
       'Trade badges are registered online and are easy to get; the constraint is beds — Milan sells out five to six months ahead, so the hotel is the booking that actually decides whether you go',
+    bookingLeadDays: 180,
     venues: ['Fiera Milano Rho', 'Euroluce / SaloneSatellite halls'],
     description:
       'Around 2,000 exhibitors across the Rho fairground, where essentially every European furniture and lighting manufacturer launches its year. SaloneSatellite gives 600 designers under 35 their own hall and is the most efficient way to see what is coming. The fairground is enormous — plan two full days minimum, and stay in the city rather than near Rho.',

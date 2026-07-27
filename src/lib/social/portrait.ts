@@ -204,7 +204,23 @@ export function portraitDrawing(
   const W = size;
   const H = Math.round(size * ratio);
   const detail = detailFor(Math.min(W, H), opts.detail);
-  const id = `mp${spec.key}${shape === 'panel' ? 'v' : ''}`;
+  /**
+   * The id namespaces every gradient and clipPath in this drawing, and it must
+   * include the SIZE as well as the seed and shape.
+   *
+   * SVG `url(#id)` references resolve against the whole document, not the
+   * enclosing <svg>. Keying on seed alone meant one member rendered at two
+   * sizes on the same page — a 32px avatar in the ranked rail and a 120px
+   * portrait in their profile sheet — emitted duplicate ids, so the smaller
+   * drawing picked up the larger one's clip circle and rendered as a square
+   * plate with the portrait shoved into one corner.
+   *
+   * Including the size keeps it deterministic (no counters, no randomness, so
+   * SSR and client still agree) while making the collision impossible. Two
+   * instances at the SAME seed, shape and size share defs harmlessly — they are
+   * byte-identical.
+   */
+  const id = `mp${spec.key}${shape === 'panel' ? 'v' : ''}s${W}x${H}${detail === 'full' ? 'f' : 'm'}`;
 
   // A panel is looked at; an avatar is glanced at. The plate is lifted and the
   // hue allowed to show at panel sizes — at 24px the same values would turn the

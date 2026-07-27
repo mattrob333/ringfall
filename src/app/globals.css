@@ -145,11 +145,29 @@
     font-feature-settings: 'tnum';
   }
 
-  /* The house surface: black glass with a lit top edge. */
+  /**
+   * The house surface: black glass with a lit top edge.
+   *
+   * Two things here are deliberate and were both learned the hard way.
+   *
+   * 1. `-webkit-backdrop-filter` is declared FIRST and the standard property
+   *    second. Lightning CSS splits these rules during minification and, at our
+   *    browser targets, was emitting only the prefixed form — so the blur
+   *    silently vanished from the production build while working in dev. The
+   *    standard property must come last so it survives and wins.
+   *
+   * 2. The background alpha is high enough that these surfaces are legible with
+   *    NO blur at all. Blur is an enhancement, not a dependency: it is the first
+   *    thing a browser drops under load, it is unsupported in some embedded
+   *    webviews, and a panel that only works when compositing cooperates is a
+   *    panel that will show a competitor's text through it one day. At 0.92 the
+   *    globe still reads as light behind the glass; at 0.82 the ranked rail was
+   *    legible straight through the profile sheet.
+   */
   .glass {
-    background: color-mix(in oklab, var(--color-obsidian) 82%, transparent);
-    backdrop-filter: blur(24px) saturate(1.3);
+    background: color-mix(in oklab, var(--color-obsidian) 92%, transparent);
     -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    backdrop-filter: blur(24px) saturate(1.3);
     border: 1px solid color-mix(in oklab, var(--color-ink) 7%, transparent);
     box-shadow:
       inset 0 1px 0 color-mix(in oklab, var(--color-ink) 6%, transparent),
@@ -157,9 +175,9 @@
   }
 
   .glass-deep {
-    background: color-mix(in oklab, var(--color-abyss) 92%, transparent);
-    backdrop-filter: blur(40px) saturate(1.4);
+    background: color-mix(in oklab, var(--color-abyss) 98%, transparent);
     -webkit-backdrop-filter: blur(40px) saturate(1.4);
+    backdrop-filter: blur(40px) saturate(1.4);
     border: 1px solid color-mix(in oklab, var(--color-ink) 8%, transparent);
     box-shadow:
       inset 0 1px 0 color-mix(in oklab, var(--color-ink) 7%, transparent),

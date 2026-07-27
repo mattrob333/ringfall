@@ -84,6 +84,7 @@ export const SAILING_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5000, max: 28000, currency: 'USD' },
     accessNote:
       'Entry is by class and closes in June; the Real Club Náutico de Palma terrace and the regatta village are ticketed for owners, crew and sponsors, and Palma berths for the first week of August are contracted from spring',
+    bookingLeadDays: 150,
     venues: ['Bay of Palma', 'Real Club Náutico de Palma'],
     nearestJetPort: LEPA,
     description:
@@ -285,6 +286,7 @@ export const SAILING_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 45000, currency: 'USD' },
     accessNote:
       'General admission is sold online and is genuinely open; the Windward VIP club and the Superyacht Village at Pier 66 South require an upgraded pass, and boarding the larger listings still needs a broker appointment',
+    bookingLeadDays: 60,
     venues: [
       'Bahia Mar Yachting Center',
       'Pier 66 Superyacht Village',
@@ -328,6 +330,7 @@ export const SAILING_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5000, max: 30000, currency: 'USD' },
     accessNote:
       'Day tickets are sold openly online; the Yacht Club lounge and the trade-only opening morning need accreditation through the organiser, and boarding the larger displays goes through the exhibiting yard',
+    bookingLeadDays: 45,
     venues: ['Dubai Harbour', 'Dubai Harbour Marina'],
     nearestJetPort: OMDW,
     description:
@@ -366,6 +369,7 @@ export const SAILING_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3000, max: 16000, currency: 'USD' },
     accessNote:
       'Entry is open and charter boats with crew are readily available out of Ao Chalong and Yacht Haven; the Kata Beach Resort race village is the hub, and the royal prizegiving is by entrant accreditation',
+    bookingLeadDays: 60,
     venues: ['Kata Beach', 'Ao Chalong', 'Andaman Sea'],
     nearestJetPort: VTSP,
     description:
@@ -493,6 +497,7 @@ export const SAILING_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 15000, max: 95000, currency: 'USD' },
     accessNote:
       'Shoreside race villages sell general tickets; the on-water spectator zone requires a permitted vessel booked through the event, and team bases and the Defender’s enclosure are guest-list only through the syndicates and their sponsors',
+    bookingLeadDays: 300,
     venues: [
       'Gulf of Naples racecourse',
       'Team bases, Bagnoli',
@@ -535,6 +540,7 @@ export const SAILING_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 35000, currency: 'USD' },
     accessNote:
       'Most events are entered through Nantucket Community Sailing or the Nantucket Yacht Club; the Opera House Cup is limited to single-hulled wooden boats, and island houses for August week are let by the previous autumn through local brokers',
+    bookingLeadDays: 300,
     venues: [
       'Nantucket Sound',
       'Nantucket Yacht Club',
@@ -579,6 +585,7 @@ export const SAILING_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 18000, max: 90000, currency: 'USD' },
     accessNote:
       'Entry is for owners of yachts over roughly 30m and is capped near 30 boats; the fleet is invited and the list barely changes year to year. Everyone else watches from a chartered boat or from Shell Beach, and the island’s villas are committed by the previous summer.',
+    bookingLeadDays: 300,
     venues: ['Gustavia Harbour', 'Port de Gustavia', 'Nikki Beach'],
     nearestJetPort: TFFJ,
     description:
@@ -617,6 +624,7 @@ export const SAILING_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 24000, currency: 'USD' },
     accessNote:
       'Trade-only — you attend as a broker, or as a client brought aboard by one. The practical route is to tell your charter broker in September that you want to walk the docks; they arrange the boat visits and the crew lunches.',
+    bookingLeadDays: 90,
     venues: ['Nelson’s Dockyard', 'Falmouth Harbour Marina', 'Antigua Yacht Club Marina'],
     nearestJetPort: TAPA,
     description:

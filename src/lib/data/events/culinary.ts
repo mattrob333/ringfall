@@ -39,6 +39,7 @@ export const CULINARY_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 25000, currency: 'USD' },
     accessNote:
       'The ceremony itself is for listed chefs, the voting academy and partners — outsiders get in through a sponsor table or a hotel partner package; the surrounding week of chef dinners across Miraflores and Barranco is where the value actually is',
+    bookingLeadDays: 180,
     venues: ['Lima', 'Central', 'Maido', 'Kjolle'],
     nearestJetPort: SPJC,
     description:
@@ -77,6 +78,7 @@ export const CULINARY_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3000, max: 12000, currency: 'USD' },
     accessNote:
       'Grand Final seats in the Bocuse d\'Or arena are allocated through national team federations and Sirha exhibitor passes; the Lyon bouchons and Mère Brazier book out for the whole Sirha week',
+    bookingLeadDays: 120,
     venues: ['Eurexpo Lyon', 'Sirha Lyon', 'Bocuse d\'Or arena'],
     nearestJetPort: LFLL,
     description:
@@ -193,6 +195,7 @@ export const CULINARY_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 2500, max: 9000, currency: 'USD' },
     accessNote:
       'Congress passes are sold openly through the organisers, but the value is elsewhere: Arzak, Akelarre and Mugaritz all run special services that week and take bookings from midsummer',
+    bookingLeadDays: 90,
     venues: ['Kursaal Congress Centre', 'Arzak', 'Akelarre', 'Parte Vieja'],
     nearestJetPort: LFBD,
     description:
@@ -235,6 +238,7 @@ export const CULINARY_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4000, max: 15000, currency: 'USD' },
     accessNote:
       'The public fair in the Cortile della Maddalena needs no ticket, and weekend entry is straightforward; the difficult bookings are the Langhe restaurants and the handful of hotels in Barolo and Serralunga, which go by August',
+    bookingLeadDays: 90,
     venues: [
       'Cortile della Maddalena',
       'Alba old town',
@@ -279,6 +283,7 @@ export const CULINARY_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 9000, max: 45000, currency: 'USD' },
     accessNote:
       'A seat in the castle is by invitation from the Piedmont regional authority and the auction organisers; remote bidders join from linked rooms in Hong Kong and elsewhere, and the lunch is served to bidders and their guests only',
+    bookingLeadDays: 120,
     venues: ['Castello di Grinzane Cavour', 'Langhe'],
     nearestJetPort: LIMF,
     description:
@@ -318,6 +323,7 @@ export const CULINARY_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5000, max: 20000, currency: 'USD' },
     accessNote:
       'Bidding is registered through Sotheby\'s in advance and lots are 228-litre barrels, not cases; the Saturday Chevaliers du Tastevin dinner at Clos de Vougeot and the Monday Paulée at Meursault are both by invitation from the négociant and domaine circuit',
+    bookingLeadDays: 180,
     venues: ['Les Halles, Beaune', 'Château du Clos de Vougeot', 'Meursault'],
     nearestJetPort: LFLL,
     description:
@@ -394,6 +400,7 @@ export const CULINARY_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 20000, currency: 'USD' },
     accessNote:
       'The old Kyoto ryotei take bookings through a ryokan or an existing customer rather than online; matsutake weeks are released two to three months ahead and domestic regulars take most of them before they surface',
+    bookingLeadDays: 90,
     venues: ['Kikunoi Honten', 'Gion', 'Higashiyama', 'Kyoto ryotei district'],
     nearestJetPort: RJOO,
     description:

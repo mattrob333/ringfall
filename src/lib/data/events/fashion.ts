@@ -29,6 +29,7 @@ export const FASHION_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4500, max: 11000, currency: 'USD' },
     accessNote:
       'Show seats are issued directly by each house’s PR office — approach the brands you already buy, or go through a Tokyo showroom agency, roughly six weeks out',
+    bookingLeadDays: 45,
     venues: ['Shibuya Hikarie', 'Omotesando', 'Tokyo International Forum'],
     description:
       'The forty-third edition runs its own calendar ahead of New York, showing around 40 Japanese labels plus a rotating group of Asian guest designers. The strength is in the mid-size independents — pattern-driven, textile-led work that never travels to the European weeks. Seats are far easier to obtain here than in Paris or Milan, and the showroom appointments afterwards are genuinely productive.',
@@ -105,6 +106,7 @@ export const FASHION_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5000, max: 13000, currency: 'USD' },
     accessNote:
       'Seats come from each house’s press office; the BFC issues nothing directly to individuals, so a client director at Burberry or Erdem is the only reliable route, arranged by late August',
+    bookingLeadDays: 60,
     venues: ['180 Studios, The Strand', 'Tate Modern', 'house-selected venues'],
     description:
       'The September schedule brings back Burberry, Erdem, Roksanda, Richard Quinn and Simone Rocha, with Seán McGirr showing McQueen in London and Christopher Kane presenting his first collection for Mulberry. London is the smallest of the four weeks and the most concentrated geographically — you can realistically make four shows a day. Marks & Spencer joins the official schedule with a see-now-buy-now centenary collection.',
@@ -257,6 +259,7 @@ export const FASHION_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 7000, max: 18000, currency: 'USD' },
     accessNote:
       'Seats are issued house by house; a client director at Michael Kors, Carolina Herrera, Ralph Lauren or Khaite is the only dependable route, and requests should be in by early January',
+    bookingLeadDays: 45,
     venues: ['Starrett-Lehigh Building', 'Spring Studios', 'off-schedule downtown venues'],
     description:
       'The autumn/winter round is the smaller and more workmanlike of New York’s two weeks, and the one where the American houses show tailoring and outerwear rather than resort. Ralph Lauren typically shows off-schedule at his own venue, which is the ticket everyone actually wants. February in New York means the parties happen indoors and the schedule holds.',
@@ -371,6 +374,7 @@ export const FASHION_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 15000, max: 40000, currency: 'USD' },
     accessNote:
       'Invitation only through your maison’s client director; the July week is smaller than January, so seats are held almost entirely for clients placing orders that season',
+    bookingLeadDays: 45,
     venues: ['Grand Palais', 'Musée Rodin', 'Place Vendôme salons', 'maison ateliers'],
     description:
       'The July couture round is where the ateliers show the most labour-intensive work of the year — embroidery and construction that can run to thousands of hours per garment. It is smaller and quieter than January, with Paris half-emptied for the summer, which makes the salon appointments afterwards considerably easier to get time in. Orders placed this week are delivered ahead of the autumn.',

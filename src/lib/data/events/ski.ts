@@ -303,6 +303,7 @@ export const SKI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 9000, max: 50000, currency: 'USD' },
     accessNote:
       'Zaborin\'s fifteen villas and the Kasara townhouses open January bookings roughly a year out and clear within days; ski-in houses in upper Hirafu are handled by two Niseko agencies',
+    bookingLeadDays: 365,
     venues: ['Grand Hirafu', 'Niseko Annupuri', 'Zaborin', 'Kasara Niseko Village'],
     nearestJetPort: RJCC,
     description:
@@ -341,6 +342,7 @@ export const SKI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 8000, max: 35000, currency: 'USD' },
     accessNote:
       'Amangani and the Four Seasons both sell Presidents\' week on minimum-stay contracts released the previous spring; Jackson Hole Mountain Guides allocate backcountry days first-come from October',
+    bookingLeadDays: 300,
     venues: [
       'Jackson Hole Mountain Resort',
       'Corbet\'s Couloir',
@@ -389,6 +391,7 @@ export const SKI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 40000, currency: 'USD' },
     accessNote:
       'Finish-area hospitality runs through the Kitzbüheler Ski Club and the race sponsors; hotel rooms in the old town are contracted a year ahead, and Stanglwirt sells the weekend as a fixed package',
+    bookingLeadDays: 365,
     venues: ['Streif', 'Hahnenkamm', 'Stanglwirt', 'Rosi\'s Sonnbergstuben'],
     nearestJetPort: LOWI,
     description:
@@ -428,6 +431,7 @@ export const SKI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5000, max: 30000, currency: 'USD' },
     accessNote:
       'The lakeside hospitality tents are sold as season packages by the White Turf organisation from autumn; the Kulm and Badrutt\'s hold blocks for guests staying the full race Sunday',
+    bookingLeadDays: 120,
     venues: ['Lake St. Moritz', 'White Turf Grandstand', 'Kulm Hotel'],
     nearestJetPort: LSZS,
     description:
@@ -467,6 +471,7 @@ export const SKI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3000, max: 18000, currency: 'USD' },
     accessNote:
       'Daytime access at Buttermilk is free; night sessions and the concerts are ticketed, and the trackside suites are sold by X Games directly from October',
+    bookingLeadDays: 120,
     venues: ['Buttermilk Mountain', 'X Games SuperPipe', 'Buttermilk Base Area'],
     nearestJetPort: KASE,
     description:
@@ -505,6 +510,7 @@ export const SKI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4000, max: 22000, currency: 'USD' },
     accessNote:
       'The face is watched from Col des Gentianes, reached on the Jumbo cable car with a normal lift pass; the competition runs on a weather window, so hold the whole week rather than a single date',
+    bookingLeadDays: 90,
     venues: ['Bec des Rosses', 'Col des Gentianes', 'Verbier Village'],
     nearestJetPort: LSGS,
     description:
@@ -543,6 +549,7 @@ export const SKI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 28000, currency: 'USD' },
     accessNote:
       'Riding is through the St. Moritz Tobogganing Club; beginners take the compulsory morning instruction from Junction, and Supplementary List riders do not need to pre-book for the 2026/27 season',
+    bookingLeadDays: 60,
     venues: ['Cresta Run', 'St. Moritz Tobogganing Club', 'Kulm Country Club'],
     nearestJetPort: LSZS,
     description:
@@ -666,6 +673,7 @@ export const SKI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3000, max: 14000, currency: 'USD' },
     accessNote:
       'Thredbo village lodges and the Lake Crackenback chalets sell the NSW school-holiday fortnight first; the practical private route is Sydney to Cooma or Canberra and roughly two hours by road',
+    bookingLeadDays: 120,
     venues: ['Thredbo Alpine Resort', 'Perisher', 'Lake Crackenback Resort'],
     nearestJetPort: YSSY,
     description:
@@ -704,6 +712,7 @@ export const SKI_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4000, max: 16000, currency: 'USD' },
     accessNote:
       'There is no jet field at the resort — aircraft clear at Buenos Aires or Mendoza and continue by turboprop to Malargüe, then 70km by road; the four base hotels are the only accommodation',
+    bookingLeadDays: 90,
     venues: ['Marte chairlift', 'Hotel Piscis', 'Valle de Las Leñas'],
     nearestJetPort: SAME,
     description:

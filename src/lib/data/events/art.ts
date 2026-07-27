@@ -44,6 +44,7 @@ export const ART_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 20000, max: 55000, currency: 'USD' },
     accessNote:
       'Individual seats and tables are sold by the museum’s development office to members and prior bidders; the preview dinners around it are personal invitations from trustees',
+    bookingLeadDays: 270,
     venues: ['Aspen Art Museum', 'ArtCrush Gala Tent'],
     description:
       'The Aspen Art Museum’s annual benefit closes out the valley’s July art week with a live auction conducted in partnership with Christie’s. Roughly two dozen lots are consigned directly by artists, and the 2026 edition honours Adrián Villar Rojas with the Lewis Family Art Award. Auction lots hang at the museum for two weeks beforehand, which is when serious bidders actually do their looking.',
@@ -83,6 +84,7 @@ export const ART_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 16000, currency: 'USD' },
     accessNote:
       'Public ticketing at the Giardini and Arsenale all season; the collateral palazzo shows and foundation dinners run on private lists secured through your gallery or a Venice-based art adviser',
+    bookingLeadDays: 90,
     venues: ['Giardini della Biennale', 'Arsenale', 'collateral palazzo venues'],
     description:
       'The oldest recurring exhibition in contemporary art, split between the national pavilions in the Giardini and the curated exhibition in the Arsenale rope works. Going in autumn rather than at the May vernissage means the city is navigable, the pavilions are quiet enough to actually read, and hotel rates are roughly half. The collateral events scattered through private palazzi are where the interesting curatorial work often sits.',
@@ -350,6 +352,7 @@ export const ART_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3000, max: 8000, currency: 'USD' },
     accessNote:
       'Free public entry across all venues once open; the March Meeting and the opening-week artist dinners require registration with Sharjah Art Foundation, which closes weeks ahead',
+    bookingLeadDays: 60,
     venues: ['Al Mureijah Art Spaces', 'Bait Al Serkal', 'Kalba Ice Factory', 'Al Hamriyah Studios'],
     description:
       'Titled "What remains, sits restive," the seventeenth edition places 109 participants across restored courtyard buildings in the Heart of Sharjah, plus outlying sites at Kalba and Al Hamriyah. It is the most curatorially serious recurring exhibition in the Gulf and it is free to enter, which keeps it honest. Going in the opening week gets you the artist talks; going in March gets you the March Meeting symposium and better weather than either end.',
@@ -426,6 +429,7 @@ export const ART_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4000, max: 10000, currency: 'USD' },
     accessNote:
       'Wednesday vernissage runs on gallery-issued passes; the private collection visits in San Ángel and Polanco are arranged by Mexico City art advisers, booked six to eight weeks out',
+    bookingLeadDays: 60,
     venues: ['Centro Citibanamex'],
     description:
       'ZONAMACO fills Centro Citibanamex with contemporary, design, photography and antiques sections and functions as the trigger for Mexico City Art Week, when Material, Salón ACME and a dozen private collections all open. The Mexican and Brazilian galleries here carry work that rarely travels north. The real value is in the house visits, which run on personal introduction rather than any ticket.',
@@ -502,6 +506,7 @@ export const ART_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 9000, max: 24000, currency: 'USD' },
     accessNote:
       'Early Access on the first two days is invitation-only via exhibiting dealers and museum acquisition committees; requests go in by January, and Maastricht’s hotel stock sells out before that',
+    bookingLeadDays: 240,
     venues: ['MECC Maastricht'],
     description:
       'More than 260 dealers from around 20 countries, covering antiquities, old masters, jewellery, modern and design, with a vetting process in which some 200 specialists strip out anything questionable before the fair opens. That vetting is the entire product — it is the one fair where museum curators buy without independent authentication. Maastricht is a small town, so book accommodation in Liège or Aachen if you leave it late.',
@@ -616,6 +621,7 @@ export const ART_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 18000, max: 45000, currency: 'USD' },
     accessNote:
       'First Choice on the Tuesday is the only card that matters and is issued to proven collectors on an exhibiting gallery’s nomination — ask your primary gallery by February for a June fair',
+    bookingLeadDays: 300,
     venues: ['Messe Basel', 'Unlimited hall', 'Parcours (Basel old town)'],
     description:
       'Messe Basel holds roughly 285 galleries and the deepest concentration of blue-chip material sold anywhere in a single week. Unlimited fills a separate 16,000-square-metre hall with works too large for any booth, and Parcours puts commissioned pieces through the old town. By Thursday morning much of the significant material has already changed hands on First Choice Tuesday — if you are coming to buy rather than to look, that is the day you need.',
