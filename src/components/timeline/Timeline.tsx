@@ -11,6 +11,7 @@ import {
 } from '@/components/ui';
 import { useHeatByDay } from '@/lib/selectors';
 import { addDays, useTimelineStore } from '@/lib/stores/useTimelineStore';
+import { useChromeStore } from '@/lib/stores/useChromeStore';
 import { DensityRibbon } from './DensityRibbon';
 import { MonthRail } from './MonthRail';
 import { SpanControl } from './SpanControl';
@@ -25,8 +26,11 @@ import {
   xForIndex,
 } from './geometry';
 
-const RIBBON_H = 44;
-const MARKERS_H = 20;
+const RIBBON_H = 38;
+const MARKERS_H = 16;
+
+/** Collapsed: enough ribbon to still read the shape of the year, nothing else. */
+const RIBBON_H_COLLAPSED = 20;
 
 export interface TimelineProps {
   className?: string;
@@ -54,6 +58,10 @@ export function Timeline({ className }: TimelineProps) {
   const playing = useTimelineStore((s) => s.playing);
   const setFocus = useTimelineStore((s) => s.setFocus);
   const setScrubbing = useTimelineStore((s) => s.setScrubbing);
+
+  const collapsed = useChromeStore((s) => s.timelineCollapsed);
+  const toggleTimeline = useChromeStore((s) => s.toggleTimeline);
+  const ribbonH = collapsed ? RIBBON_H_COLLAPSED : RIBBON_H;
 
   const days = useHeatByDay();
 
@@ -198,36 +206,57 @@ export function Timeline({ className }: TimelineProps) {
   return (
     <div
       className={cn(
-        'glass w-full px-5 pb-2.5 pt-3',
+        'glass w-full px-5', collapsed ? 'pb-1.5 pt-2' : 'pb-2.5 pt-3',
         className,
       )}
     >
       {/* ── Header: transport · the date · the window ──────────────── */}
-      <div className="flex items-end justify-between gap-6 pb-2.5">
-        <Transport compact={compact} />
+      <div className={cn('flex items-end justify-between gap-6', collapsed ? 'pb-1.5' : 'pb-2.5')}>
+        <Transport compact={compact || collapsed} />
 
-        <div className="flex min-w-0 flex-col items-center gap-1">
-          <span className="label-sm text-ink-muted">
-            {formatDateRange(
-              addDays(focus, -spanDays) < rangeStart ? rangeStart : addDays(focus, -spanDays),
-              addDays(focus, spanDays) > rangeEnd ? rangeEnd : addDays(focus, spanDays),
-            )}
-          </span>
+        <div className={cn('flex min-w-0 items-center', collapsed ? 'gap-3' : 'flex-col gap-1')}>
+          {!collapsed && (
+            <span className="label-sm text-ink-muted">
+              {formatDateRange(
+                addDays(focus, -spanDays) < rangeStart ? rangeStart : addDays(focus, -spanDays),
+                addDays(focus, spanDays) > rangeEnd ? rangeEnd : addDays(focus, spanDays),
+              )}
+            </span>
+          )}
           <span
-            className="font-display whitespace-nowrap text-[19px] leading-none text-ink"
+            className={cn(
+              'font-display whitespace-nowrap leading-none text-ink',
+              collapsed ? 'text-[15px]' : 'text-[19px]',
+            )}
             aria-hidden
           >
             {formatDateFull(focus)}
           </span>
         </div>
 
-        <SpanControl />
+        <div className="flex items-center gap-3">
+          <SpanControl />
+          <button
+            type="button"
+            onClick={toggleTimeline}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? 'Expand the scrubber' : 'Collapse the scrubber'}
+            title={collapsed ? 'Expand the scrubber' : 'Collapse the scrubber'}
+            className="flex size-6 shrink-0 items-center justify-center rounded-[2px] text-ink-muted transition-colors duration-[var(--duration-instant)] hover:bg-slate-lift hover:text-ink"
+          >
+            <svg viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.25" aria-hidden>
+              <path d={collapsed ? 'M3 10l5-4 5 4' : 'M3 6l5 4 5-4'} strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* ── Markers ─────────────────────────────────────────────────── */}
-      <div style={{ height: MARKERS_H }}>
-        {ready ? <TimelineMarkers geometry={geometry} /> : null}
-      </div>
+      {!collapsed && (
+        <div style={{ height: MARKERS_H }}>
+          {ready ? <TimelineMarkers geometry={geometry} /> : null}
+        </div>
+      )}
 
       {/* ── The track ───────────────────────────────────────────────── */}
       <div
@@ -237,14 +266,14 @@ export function Timeline({ className }: TimelineProps) {
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         className="relative w-full cursor-ew-resize touch-none select-none"
-        style={{ height: RIBBON_H }}
+        style={{ height: ribbonH }}
       >
         {ready ? (
           <>
             <DensityRibbon
               days={days}
               geometry={geometry}
-              height={RIBBON_H}
+              height={ribbonH}
               className="absolute inset-0"
             />
 
@@ -262,7 +291,7 @@ export function Timeline({ className }: TimelineProps) {
                 'pointer-events-none absolute w-px bg-brass',
                 !scrubbing && 'transition-[left] duration-[var(--duration-instant)] ease-[var(--ease-glide)]',
               )}
-              style={{ left: handleX, top: -MARKERS_H, height: RIBBON_H + MARKERS_H }}
+              style={{ left: handleX, top: collapsed ? 0 : -MARKERS_H, height: collapsed ? ribbonH : ribbonH + MARKERS_H }}
             />
 
             {/* The grip. Also the slider for assistive tech and the keyboard. */}
@@ -288,12 +317,12 @@ export function Timeline({ className }: TimelineProps) {
             </div>
           </>
         ) : (
-          <Skeleton className="absolute inset-x-0 bottom-0" height={RIBBON_H - 8} />
+          <Skeleton className="absolute inset-x-0 bottom-0" height={ribbonH - 8} />
         )}
       </div>
 
       {/* ── The axis, with the exact date riding it ─────────────────── */}
-      <div className="relative mt-1.5 w-full">
+      <div className={cn('relative mt-1.5 w-full', collapsed && 'hidden')}>
         {ready ? <MonthRail geometry={geometry} /> : null}
         {ready ? (
           <div
@@ -313,7 +342,7 @@ export function Timeline({ className }: TimelineProps) {
         ) : null}
       </div>
 
-      <Rule variant="hairline" className="mt-2" />
+      <Rule variant="hairline" className={collapsed ? 'mt-1.5' : 'mt-2'} />
       <span className="sr-only" aria-live="polite">
         {playing ? `Playing. ${formatDateFull(focus)}` : ''}
       </span>

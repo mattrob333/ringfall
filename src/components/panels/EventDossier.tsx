@@ -117,10 +117,13 @@ export function EventDossier({ className }: EventDossierProps) {
           className={cn(
             // Anchored below the top chrome stack (masthead + scrubber + filters)
             // and clear of the ranked rail on the right. The centre stays open.
-            'glass-deep fixed bottom-4 left-4 top-[17rem] z-40 flex w-[min(30rem,36vw)]',
+            // The top offset is `--chrome-h`, measured and published by the
+            // shell — the scrubber collapses, so no constant could be right.
+            'glass-deep fixed bottom-4 left-4 z-40 flex w-[min(30rem,36vw)]',
             'flex-col rounded-[3px] outline-none',
             className,
           )}
+          style={{ top: 'calc(var(--chrome-h) + 0.75rem)' }}
           initial={reduced ? { opacity: 0 } : { opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           exit={reduced ? { opacity: 0 } : { opacity: 0, x: -20 }}

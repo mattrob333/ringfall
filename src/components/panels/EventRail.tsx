@@ -98,7 +98,7 @@ export function EventRail({ className }: EventRailProps) {
     // would, and a card chasing the cursor across a list is noise.
     <section
       className={cn(
-        'glass-deep flex h-[min(66vh,42rem)] w-[19rem] flex-col rounded-[3px] xl:w-[22rem]',
+        'glass-deep flex h-full max-h-full w-[19rem] flex-col rounded-[3px] xl:w-[22rem]',
         className,
       )}
       data-meridian-surface=""
