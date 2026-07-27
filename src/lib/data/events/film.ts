@@ -44,6 +44,7 @@ export const FILM_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 30000, max: 120000, currency: 'USD' },
     accessNote:
       'There is no public ticket — accreditation runs through the industry, press or Marché du Film badge system, and competition screenings need a separate invitation on top; the practical route is a Marché badge plus a distributor or sales-agent host, with Croisette hotels and villas contracted the previous autumn',
+    bookingLeadDays: 300,
     venues: [
       'Palais des Festivals',
       'Grand Théâtre Lumière',
@@ -164,6 +165,7 @@ export const FILM_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 7000, max: 26000, currency: 'USD' },
     accessNote:
       'Public tickets go on sale three days before each screening online and at the Potsdamer Platz box offices, and premieres clear in minutes; the European Film Market badge is the reliable route in, and it also gets you the industry screenings',
+    bookingLeadDays: 90,
     venues: [
       'Berlinale Palast',
       'Zoo Palast',
@@ -207,6 +209,7 @@ export const FILM_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 12000, max: 45000, currency: 'USD' },
     accessNote:
       'Passes are sold by tier and the top Patron pass sells out months ahead; nothing is announced in advance, so you commit blind by around May, and Telluride\'s few hundred hotel rooms plus the Mountain Village condos are gone at the same time',
+    bookingLeadDays: 120,
     venues: ['Werner Herzog Theatre', 'Chuck Jones Cinema', 'Palm Theatre', 'Galaxy'],
     nearestJetPort: KASE,
     description:
@@ -360,6 +363,7 @@ export const FILM_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3500, max: 12000, currency: 'USD' },
     accessNote:
       'Public tickets open online roughly two weeks ahead and the opening and closing films go instantly; the Asian Contents & Film Market badge is the industry route, and the Park Hyatt and Signiel in Haeundae should be held a couple of months out',
+    bookingLeadDays: 60,
     venues: ['Busan Cinema Center', 'CGV Centum City', 'Lotte Cinema Centum City', 'Haeundae'],
     nearestJetPort: RKSS,
     description:
@@ -398,6 +402,7 @@ export const FILM_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4500, max: 16000, currency: 'USD' },
     accessNote:
       'Public tickets are sold online in advance of each screening and the competition titles move quickly; TIFFCOM, the market, runs 28–30 October at Hamamatsucho on a separate industry badge, and Marunouchi hotel rooms should be held by late summer',
+    bookingLeadDays: 90,
     venues: ['Tokyo Takarazuka Theatre', 'Hibiya', 'Marunouchi', 'Ginza'],
     nearestJetPort: RJTT,
     description:
@@ -475,6 +480,7 @@ export const FILM_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 2500, max: 9000, currency: 'USD' },
     accessNote:
       'Tickets are sold through a straightforward online system that opens in late June and prices are genuinely low; the scarce resource is a room at the Grandhotel Pupp, which is where the festival socially operates and which must be booked by spring',
+    bookingLeadDays: 120,
     venues: ['Hotel Thermal', 'Grandhotel Pupp', 'Karlovy Vary Municipal Theatre'],
     nearestJetPort: LKPR,
     description:

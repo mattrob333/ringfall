@@ -181,17 +181,36 @@ export function PortraitPlate({
 /**
  * Node tree → React elements.
  *
- * Attribute names are passed through exactly as written (`stop-color`,
- * `clip-path`), which React DOM sets verbatim on SVG elements. Doing it this
- * way rather than translating to camelCase is what keeps one description of the
- * drawing instead of two that can drift.
+ * The tree is written in SVG's own spelling (`stop-color`, `clip-path`) because
+ * that is what the string serializer emits and what a `.svg` file needs. React
+ * DOM insists on the camelCase spelling for every presentation attribute it
+ * knows about — passing `stop-color` through renders the right markup but logs
+ * an "Invalid DOM property" warning for each one — so the names are converted
+ * here, at the single point of translation. `data-` and `aria-` keep their
+ * hyphens, which is React's own rule.
  */
 function renderNode(node: PortraitNode, key: string): ReactElement {
   const children =
     node.text !== undefined
       ? node.text
       : (node.children ?? []).map((child, i) => renderNode(child, `${key}.${i}`));
-  return createElement(node.tag, { key, ...node.attrs }, children);
+
+  const props: Record<string, unknown> = { key };
+  for (const [name, value] of Object.entries(node.attrs)) {
+    props[reactAttr(name)] = value;
+  }
+  return createElement(node.tag, props, children);
+}
+
+const attrCache = new Map<string, string>();
+
+function reactAttr(name: string): string {
+  if (!name.includes('-') || name.startsWith('data-') || name.startsWith('aria-')) return name;
+  const hit = attrCache.get(name);
+  if (hit) return hit;
+  const camel = name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+  attrCache.set(name, camel);
+  return camel;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

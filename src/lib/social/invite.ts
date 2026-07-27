@@ -368,14 +368,18 @@ function cabinParagraph(
   const tail = metal ? '' : ' The aircraft is not held yet.';
   const lines: string[] = [];
 
+  // Half the simulated cabins are named after their departure field, and
+  // "LPCS → KACK, from LPCS" reads like a mail merge. Say the hub once.
+  const named = group.name.toUpperCase().includes(group.departureHub.toUpperCase());
+  const outOf = named ? '' : ` out of ${group.departureHub}`;
   const opener = hosting
     ? [
-        `I am putting the cabin together myself — ${group.name}, out of ${group.departureHub} on the ${out}${inMetal}. ${filled} of ${group.capacity} seats are taken.${tail}`,
-        `The flight is mine: ${group.name}, out of ${group.departureHub} on the ${out}${inMetal}. ${filled} of ${group.capacity} in so far.${tail}`,
+        `I am putting the cabin together myself — ${group.name},${outOf} on the ${out}${inMetal}. ${filled} of ${group.capacity} seats are taken.${tail}`,
+        `The flight is mine: ${group.name},${outOf} on the ${out}${inMetal}. ${filled} of ${group.capacity} in so far.${tail}`,
       ]
     : [
-        `There is a cabin on it — ${group.name}, out of ${group.departureHub} on the ${out}${inMetal}. ${filled} of ${group.capacity} seats taken.${tail}`,
-        `A group is already forming: ${group.name}, from ${group.departureHub} on the ${out}${inMetal}. ${filled} of ${group.capacity} taken.${tail}`,
+        `There is a cabin on it — ${group.name},${outOf} on the ${out}${inMetal}. ${filled} of ${group.capacity} seats taken.${tail}`,
+        `A group is already forming: ${group.name},${outOf} on the ${out}${inMetal}. ${filled} of ${group.capacity} taken.${tail}`,
         `${group.name} is the flight — ${group.departureHub} to ${event.nearestJetPort.code} on the ${out}${inMetal}, ${filled} of ${group.capacity} in.${tail}`,
       ];
   lines.push(rng.pick(opener));

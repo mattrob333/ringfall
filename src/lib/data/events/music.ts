@@ -49,6 +49,7 @@ export const MUSIC_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6500, max: 28000, currency: 'USD' },
     accessNote:
       'Passes sell in a January advance sale and again in a January general sale, both minutes long; the practical route is a Safari or Lake Eldorado on-site package, or a brand guest list secured through a talent agency by February',
+    bookingLeadDays: 90,
     venues: ['Empire Polo Club', 'Coachella Stage', 'Sahara Tent', 'Yuma'],
     nearestJetPort: KTRM,
     description:
@@ -88,6 +89,7 @@ export const MUSIC_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5500, max: 24000, currency: 'USD' },
     accessNote:
       'Weekend two passes stay available for weeks after weekend one sells out, and resale softens sharply once the first weekend ends; villa rentals in Palm Springs are materially cheaper for these three nights',
+    bookingLeadDays: 60,
     venues: ['Empire Polo Club', 'Coachella Stage', 'Sahara Tent', 'Outdoor Theatre'],
     nearestJetPort: KTRM,
     description:
@@ -204,6 +206,7 @@ export const MUSIC_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 28000, max: 75000, currency: 'USD' },
     accessNote:
       'The full programme is published in December and the written order period closes in early January; premiere-night parterre seats effectively require Freunde der Salzburger Festspiele membership or a corporate sponsor allocation, and August hotel rooms go a year out',
+    bookingLeadDays: 300,
     venues: [
       'Grosses Festspielhaus',
       'Haus für Mozart',
@@ -248,6 +251,7 @@ export const MUSIC_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 12000, max: 38000, currency: 'USD' },
     accessNote:
       'The public ballot has historically run to a multi-year wait; the practical routes are a Richard Wagner society membership with its allocated quota, one of the Festival\'s own multi-day packages, or the small online contingent released in autumn',
+    bookingLeadDays: 730,
     venues: ['Bayreuth Festspielhaus'],
     nearestJetPort: EDDN,
     description:
@@ -286,6 +290,7 @@ export const MUSIC_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 24000, currency: 'USD' },
     accessNote:
       'Auditorium Stravinski and Lab tickets go on general sale in spring and the marquee nights clear quickly; the Montreux Palace and Fairmont sell festival packages that bundle seats, and lakefront suites need booking by March',
+    bookingLeadDays: 120,
     venues: [
       'Auditorium Stravinski',
       'Montreux Jazz Lab',
@@ -566,6 +571,7 @@ export const MUSIC_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 2200, max: 7500, currency: 'USD' },
     accessNote:
       'Tickets are released in tranches from roughly November and are not usually a scramble; the real work is the approach — Quaggafontein is a four-hour drive from Cape Town on corrugated gravel, so a high-clearance 4x4 and all your own water are non-negotiable',
+    bookingLeadDays: 90,
     venues: ['Quaggafontein Private Nature Reserve', 'The Binnekring', 'Tankwa Town'],
     nearestJetPort: FACT,
     description:
@@ -605,6 +611,7 @@ export const MUSIC_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4500, max: 15000, currency: 'USD' },
     accessNote:
       'The programme drops in a single announcement around late April and Night Mass, the Winter Feast sittings and the Nude Solstice Swim all sell within hours; Hobart\'s hotel stock is small, so a room at MACq 01 or The Tasman must be held before the lineup is public',
+    bookingLeadDays: 90,
     venues: ['Mona', 'Princes Wharf 1', 'Odeon Theatre', 'Hobart waterfront'],
     nearestJetPort: YMHB,
     description:
@@ -644,6 +651,7 @@ export const MUSIC_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3500, max: 13000, currency: 'USD' },
     accessNote:
       'Three-day and single-day passes go on sale in stages from roughly September, and VIP includes a raised deck over the harbour; Central hotels do not sell out for it, so a Rosewood or Upper House room booked a month ahead is enough',
+    bookingLeadDays: 30,
     venues: ['Central Harbourfront Event Space', 'Harbourflap Stage', 'Cargo Stage'],
     nearestJetPort: VHHH,
     description:

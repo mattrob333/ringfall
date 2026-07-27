@@ -31,6 +31,7 @@ export const GALA_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 60000, max: 250000, currency: 'USD' },
     accessNote:
       'There is no ticket and no application that works cold — debutantes are selected by the organiser, Ophélie Renouard, usually a year ahead, and every other seat in the room is a parent, a sponsor house or a press invitation; the practical route is a couture-house or jewellery-maison relationship',
+    bookingLeadDays: 365,
     venues: ['Shangri-La Paris', 'Paris palace hotel ballroom'],
     nearestJetPort: LFPB,
     description:
@@ -70,6 +71,7 @@ export const GALA_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 45000, max: 200000, currency: 'USD' },
     accessNote:
       'Seats and tables are sold through amfAR\'s development office and its Cannes partners, and a single seat runs well into five figures before the auction; commitments are taken from around February and the room is closed by April, with Hôtel du Cap rooms gone far earlier',
+    bookingLeadDays: 300,
     venues: ['Hôtel du Cap-Eden-Roc', 'Eden-Roc pavilion'],
     nearestJetPort: LFMN,
     description:
@@ -148,6 +150,7 @@ export const GALA_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 10000, max: 40000, currency: 'USD' },
     accessNote:
       'Performance tickets are sold to the public, but the gala itself — the plaza dinner before and the supper after — is a benefit package bought through the Met\'s development office, typically confirmed by June; parterre boxes are held by long-standing patrons and rarely circulate',
+    bookingLeadDays: 120,
     venues: ['Metropolitan Opera House', 'Lincoln Center plaza'],
     nearestJetPort: KTEB,
     description:
@@ -304,6 +307,7 @@ export const GALA_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3000, max: 12000, currency: 'USD' },
     accessNote:
       'Tickets go on sale to the public on 11 January 2027 direct from the Vienna Philharmonic, starting around €220, and the boxes and Golden Hall tables sell first; it is genuinely buyable, unlike the Opera Ball boxes, but only if you are ready on the release date',
+    bookingLeadDays: 10,
     venues: ['Musikverein', 'Golden Hall', 'Brahms-Saal'],
     nearestJetPort: LOWW,
     description:
@@ -343,6 +347,7 @@ export const GALA_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5000, max: 20000, currency: 'USD' },
     accessNote:
       'Tables and individual places are sold through the Belmond Copacabana Palace and its authorised Carnival agents from around October, with hotel guests given first refusal; strictly 18+, and the costume requirement is enforced rather than suggested',
+    bookingLeadDays: 365,
     venues: ['Belmond Copacabana Palace', 'Golden Room'],
     nearestJetPort: SBJR,
     description:
@@ -382,6 +387,7 @@ export const GALA_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 25000, currency: 'USD' },
     accessNote:
       'There is no ticket sale — the room is filled by Fashion Trust Arabia\'s board, its jury, the shortlisted designers and invited press; access runs through the organisation\'s patron network or a participating house, and invitations go out roughly two months ahead',
+    bookingLeadDays: 60,
     venues: ['National Museum of Qatar', 'M7 Doha'],
     nearestJetPort: OTHH,
     description:
@@ -421,6 +427,7 @@ export const GALA_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 8000, max: 28000, currency: 'USD' },
     accessNote:
       'Places are bought directly from Antonia Sautter\'s atelier by tier, and the costume is the real commitment — most guests rent from her own workshop, which requires fittings in Venice or measurements submitted weeks ahead; the room is a few hundred people and closes by January',
+    bookingLeadDays: 120,
     venues: ['Scuola Grande della Misericordia', 'Cannaregio'],
     nearestJetPort: LIPZ,
     description:

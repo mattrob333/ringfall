@@ -44,8 +44,75 @@ export type { DripController, SimulatedWorld } from './simulation';
 export { useSocialHydration, socialSnapshot } from './useSocialStore';
 export type { ScoredEventLite } from './useSocialStore';
 
-export { avatarSpec, avatarSvg, avatarDataUri, avatarAccent, initialsFrom } from './avatar';
-export type { AvatarSpec } from './avatar';
+export { avatarSpec, avatarSvg, avatarDataUri, avatarAccent, initialsFrom, avatarSrc, isPhotoUrl } from './avatar';
+export type { AvatarSpec, AvatarSource } from './avatar';
+
+// ── Portraits ───────────────────────────────────────────────────────────────
+export {
+  portraitSpec,
+  portraitDrawing,
+  portraitSvg,
+  portraitDataUri,
+  readImageAsPortrait,
+  isUsablePhotoUrl,
+  PORTRAIT_MAX_PX,
+} from './portrait';
+export type {
+  PortraitSpec,
+  PortraitNode,
+  PortraitOptions,
+  PortraitShape,
+  PortraitDrawing,
+} from './portrait';
+
+// ── The register ────────────────────────────────────────────────────────────
+export {
+  GATEWAYS,
+  GATEWAY_INDEX,
+  searchGateways,
+  nearestGateway,
+  distanceToGateway,
+  toHomeBase,
+  gatewayFor,
+  resolveVoucher,
+} from './members';
+export type { Gateway, GatewayMatch, MemberDossier } from './members';
+
+// ── Links and invitations ───────────────────────────────────────────────────
+export {
+  buildTripLink,
+  readTripLink,
+  buildInviteEmail,
+  buildMailto,
+  buildSharePayload,
+  isValidEmail,
+  parseEmails,
+  proseDates,
+  shortDates,
+  longDate,
+} from './invite';
+export type { InviteEmail, InviteEmailOptions, SharePayload, TripLinkTarget } from './invite';
+
+// ── Activity ────────────────────────────────────────────────────────────────
+export {
+  buildActivityFeed,
+  describeNotification,
+  useActivityFeed,
+  useUnreadActivityCount,
+} from './notifications';
+export type { ActivityNotification, NotificationKind, ActivityInput } from './notifications';
+
+// ── Profile UI state ────────────────────────────────────────────────────────
+export {
+  useProfileUiStore,
+  useOpenProfile,
+  useOpenProfileId,
+  openProfile,
+} from './profileStore';
+export type { TripInvitation } from './profileStore';
+
+export { INVITE_ALLOWANCE } from './useSocialStore';
+export type { SavedContact, MemberAsk } from './useSocialStore';
 
 export { makeRng, hashSeed } from './rng';
 export type { Rng } from './rng';

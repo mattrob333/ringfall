@@ -39,6 +39,30 @@ export type { CurrentMemberChipProps } from './CurrentMemberChip';
 export { Avatar } from './Avatar';
 export type { AvatarProps } from './Avatar';
 
+// ── Faces, profiles and invitations ─────────────────────────────────────────
+export { MemberPortrait, PortraitPlate, PortraitField } from './MemberPortrait';
+export type {
+  MemberPortraitProps,
+  PortraitPlateProps,
+  PortraitFieldProps,
+} from './MemberPortrait';
+
+export { MemberProfileSheet, SocialRoot } from './MemberProfileSheet';
+export type { MemberProfileSheetProps } from './MemberProfileSheet';
+
+/**
+ * Open any member's record from anywhere — no prop drilling, no provider, and
+ * no requirement to be a descendant of the sheet. The sheet itself is mounted
+ * once by `CurrentMemberChip`.
+ */
+export { useOpenProfile, useOpenProfileId, openProfile } from '@/lib/social/profileStore';
+
+export { ShareTrip, TripLinkReader } from './ShareTrip';
+export type { ShareTripProps } from './ShareTrip';
+
+export { InviteDialog } from './InviteDialog';
+export type { InviteDialogProps } from './InviteDialog';
+
 // ── Supporting pieces, exported because they are useful elsewhere ───────────
 export { MemberTierMark, MEMBER_TIER_LABEL } from './MemberTierMark';
 export type { MemberTierMarkProps } from './MemberTierMark';

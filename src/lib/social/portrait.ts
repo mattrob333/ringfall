@@ -75,41 +75,43 @@ export function portraitSpec(seed: string): PortraitSpec {
   const base = avatarSpec(seed);
   const rand = mulberry32(hashSeed(`portrait:${seed}`));
 
-  const formX = 0.5 + (rand() - 0.5) * 0.16;
-  const formY = 0.72 + rand() * 0.1;
-  const formR = 0.4 + rand() * 0.12;
-  const formLean = (rand() - 0.5) * 0.22;
+  const formX = 0.5 + (rand() - 0.5) * 0.28;
+  // Anchored below the bottom edge, so the mass is cropped rather than floating
+  // — a shoulder line leaving the frame, not an egg in the middle of it.
+  const formY = 1.0 + rand() * 0.16;
+  const formR = 0.26 + rand() * 0.2;
+  const formLean = (rand() - 0.5) * 0.34;
 
-  // A closed, gently irregular outline. Seven radii around the centre, smoothed
-  // into a single path later — a soft mass rising into the light rather than a
-  // silhouette of a person, which is the thing we are careful not to fake.
+  // A closed, gently irregular outline. Nine radii around the centre, smoothed
+  // into one path later. Wider than tall and sitting low: it reads as a lit
+  // form under a single source, which is as close to a portrait as this gets
+  // without inventing a face for somebody who does not exist.
   const points: [number, number][] = [];
-  const n = 7;
+  const n = 9;
   for (let i = 0; i < n; i++) {
     const t = (i / n) * Math.PI * 2;
-    const wobble = 0.82 + rand() * 0.36;
-    // Wider than tall: this reads as shoulders and air, not a balloon.
-    const rx = formR * wobble * 1.16;
-    const ry = formR * wobble * 1.34;
+    const wobble = 0.84 + rand() * 0.36;
+    const rx = formR * wobble * 1.5;
+    const ry = formR * wobble * 1.62;
     points.push([
-      round3(formX + Math.cos(t) * rx + formLean * Math.sin(t) * 0.4),
+      round3(formX + Math.cos(t) * rx + formLean * Math.sin(t) * 0.5),
       round3(formY + Math.sin(t) * ry),
     ]);
   }
 
   const spec: PortraitSpec = {
     ...base,
-    lightX: round3(0.22 + rand() * 0.18),
-    lightY: round3(0.12 + rand() * 0.16),
+    lightX: round3(0.2 + rand() * 0.2),
+    lightY: round3(0.1 + rand() * 0.14),
     formX: round3(formX),
     formY: round3(formY),
     formR: round3(formR),
     formLean: round3(formLean),
     formPoints: points,
-    guillocheRings: 5 + Math.floor(rand() * 4),
+    guillocheRings: 4 + Math.floor(rand() * 4),
     guillocheAngle: Math.round(rand() * 180),
-    horizonY: round3(0.6 + rand() * 0.1),
-    vignette: round3(0.34 + rand() * 0.2),
+    horizonY: round3(0.58 + rand() * 0.1),
+    vignette: round3(0.5 + rand() * 0.16),
   };
 
   cache.set(seed, spec);
@@ -117,6 +119,22 @@ export function portraitSpec(seed: string): PortraitSpec {
 }
 
 const round3 = (n: number): number => Math.round(n * 1000) / 1000;
+
+/**
+ * Rescale an `hsl(h s% l%)` string's saturation and lightness independently.
+ *
+ * One generator, two sizes: the same seed has to work as a 24px plate in a peer
+ * stack and as a full-height panel on a profile, and those want different
+ * tones for the same colour. This is the only place that difference lives.
+ */
+function tone(hsl: string, satFactor: number, lightFactor: number): string {
+  const m = /^hsl\(([\d.]+) ([\d.]+)% ([\d.]+)%\)$/.exec(hsl);
+  if (!m) return hsl;
+  const h = Number(m[1]);
+  const sat = Math.min(34, Number(m[2]) * satFactor);
+  const light = Math.min(26, Number(m[3]) * lightFactor);
+  return `hsl(${r2(h)} ${r2(sat)}% ${r2(light)}%)`;
+}
 const r2 = (n: number): number => Math.round(n * 100) / 100;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -188,21 +206,41 @@ export function portraitDrawing(
   const detail = detailFor(Math.min(W, H), opts.detail);
   const id = `mp${spec.key}${shape === 'panel' ? 'v' : ''}`;
 
+  // A panel is looked at; an avatar is glanced at. The plate is lifted and the
+  // hue allowed to show at panel sizes — at 24px the same values would turn the
+  // stack into a row of coloured dots.
+  // Area effect: the same fill that reads as dark graphite in a 24px disc reads
+  // as a colour wash across a 320px panel. A panel therefore gets the *darker*
+  // treatment — two thirds of the lightness, full saturation — which is what
+  // keeps a wall of these looking like black glass rather than swatches.
+  const top = shape === 'panel' ? tone(spec.plateTop, 1, 0.62) : spec.plateTop;
+  const bottom = shape === 'panel' ? tone(spec.plateBottom, 1, 0.6) : spec.plateBottom;
+  // A panel is lit from above. An SVG linear gradient runs left→right at 0°, so
+  // "from the top" is 90° — the seeded angle becomes a ±18° variation around
+  // that, rather than a free rotation that would light a third of the roster
+  // from underneath.
+  const plateAngle = shape === 'panel' ? r2(90 + ((spec.angle % 36) - 18)) : r2(spec.angle);
+
   const defs: PortraitNode[] = [
     {
       tag: 'linearGradient',
-      attrs: { id: `${id}p`, gradientTransform: `rotate(${r2(spec.angle)} 0.5 0.5)` },
+      attrs: { id: `${id}p`, gradientTransform: `rotate(${plateAngle} 0.5 0.5)` },
       children: [
-        { tag: 'stop', attrs: { offset: '0%', 'stop-color': spec.plateTop } },
-        { tag: 'stop', attrs: { offset: '100%', 'stop-color': spec.plateBottom } },
+        { tag: 'stop', attrs: { offset: '0%', 'stop-color': top } },
+        { tag: 'stop', attrs: { offset: '100%', 'stop-color': bottom } },
       ],
     },
     {
       tag: 'radialGradient',
-      attrs: { id: `${id}k`, cx: `${r2(spec.lightX * 100)}%`, cy: `${r2(spec.lightY * 100)}%`, r: '78%' },
+      attrs: {
+        id: `${id}k`,
+        cx: `${r2(spec.lightX * 100)}%`,
+        cy: `${r2(spec.lightY * 100)}%`,
+        r: '64%',
+      },
       children: [
-        { tag: 'stop', attrs: { offset: '0%', 'stop-color': `rgba(${INK},0.17)` } },
-        { tag: 'stop', attrs: { offset: '55%', 'stop-color': `rgba(${INK},0.05)` } },
+        { tag: 'stop', attrs: { offset: '0%', 'stop-color': `rgba(${INK},0.11)` } },
+        { tag: 'stop', attrs: { offset: '45%', 'stop-color': `rgba(${INK},0.03)` } },
         { tag: 'stop', attrs: { offset: '100%', 'stop-color': `rgba(${INK},0)` } },
       ],
     },
@@ -210,30 +248,63 @@ export function portraitDrawing(
 
   if (detail === 'full') {
     defs.push(
+      // A band of light along the top edge. Two sources — this and the key
+      // light — are what stop the plate reading as a single flat wash.
       {
         tag: 'linearGradient',
-        attrs: { id: `${id}f`, x1: '0', y1: '0', x2: '0.35', y2: '1' },
+        attrs: { id: `${id}e`, gradientTransform: 'rotate(90 0.5 0.5)' },
         children: [
-          { tag: 'stop', attrs: { offset: '0%', 'stop-color': `rgba(${INK},0.20)` } },
-          { tag: 'stop', attrs: { offset: '46%', 'stop-color': spec.accent, 'stop-opacity': '0.16' } },
-          { tag: 'stop', attrs: { offset: '100%', 'stop-color': `rgba(${INK},0)` } },
+          { tag: 'stop', attrs: { offset: '0%', 'stop-color': `rgba(${INK},0.07)` } },
+          { tag: 'stop', attrs: { offset: '30%', 'stop-color': `rgba(${INK},0)` } },
+        ],
+      },
+      // The halo sits behind the form, in the plate's own accent, and is the
+      // only place in the drawing where the hue is unambiguous.
+      {
+        tag: 'radialGradient',
+        attrs: { id: `${id}h`, cx: '50%', cy: '50%', r: '50%' },
+        children: [
+          { tag: 'stop', attrs: { offset: '0%', 'stop-color': spec.accent, 'stop-opacity': '0.17' } },
+          { tag: 'stop', attrs: { offset: '55%', 'stop-color': spec.accent, 'stop-opacity': '0.06' } },
+          { tag: 'stop', attrs: { offset: '100%', 'stop-color': spec.accent, 'stop-opacity': '0' } },
+        ],
+      },
+      // The form: lit along its top edge, falling into the plate at the bottom.
+      {
+        tag: 'linearGradient',
+        attrs: { id: `${id}f`, x1: '0.25', y1: '0', x2: '0.75', y2: '1' },
+        children: [
+          { tag: 'stop', attrs: { offset: '0%', 'stop-color': `rgba(${INK},0.12)` } },
+          { tag: 'stop', attrs: { offset: '38%', 'stop-color': `rgba(${INK},0.05)` } },
+          { tag: 'stop', attrs: { offset: '72%', 'stop-color': 'rgba(0,0,0,0.18)' } },
+          { tag: 'stop', attrs: { offset: '100%', 'stop-color': 'rgba(0,0,0,0.55)' } },
         ],
       },
       {
         tag: 'radialGradient',
-        attrs: { id: `${id}v`, cx: '50%', cy: '46%', r: '76%' },
+        attrs: { id: `${id}v`, cx: '50%', cy: '38%', r: '80%' },
         children: [
-          { tag: 'stop', attrs: { offset: '52%', 'stop-color': 'rgba(0,0,0,0)' } },
+          { tag: 'stop', attrs: { offset: '30%', 'stop-color': 'rgba(0,0,0,0)' } },
           { tag: 'stop', attrs: { offset: '100%', 'stop-color': `rgba(0,0,0,${r2(spec.vignette)})` } },
         ],
       },
       {
         tag: 'filter',
-        attrs: { id: `${id}b`, x: '-20%', y: '-20%', width: '140%', height: '140%' },
+        attrs: { id: `${id}b`, x: '-25%', y: '-25%', width: '150%', height: '150%' },
         children: [
           {
             tag: 'feGaussianBlur',
-            attrs: { stdDeviation: r2(Math.max(1, W * 0.035)), edgeMode: 'duplicate' },
+            attrs: { stdDeviation: r2(Math.max(0.8, W * 0.018)), edgeMode: 'duplicate' },
+          },
+        ],
+      },
+      {
+        tag: 'filter',
+        attrs: { id: `${id}s`, x: '-25%', y: '-25%', width: '150%', height: '150%' },
+        children: [
+          {
+            tag: 'feGaussianBlur',
+            attrs: { stdDeviation: r2(Math.max(0.4, W * 0.006)), edgeMode: 'duplicate' },
           },
         ],
       },
@@ -246,6 +317,19 @@ export function portraitDrawing(
       ? { tag: 'circle', attrs: { cx: r2(W / 2), cy: r2(H / 2), r: r2(W / 2) } }
       : { tag: 'rect', attrs: { x: 0, y: 0, width: W, height: H, rx: 2 } };
   defs.push({ tag: 'clipPath', attrs: { id: `${id}c` }, children: [clipChild] });
+  if (detail === 'full') {
+    // Upper half only — the lit side.
+    defs.push({
+      tag: 'clipPath',
+      attrs: { id: `${id}t` },
+      children: [
+        {
+          tag: 'rect',
+          attrs: { x: 0, y: 0, width: W, height: r2((spec.formY - spec.formR * 0.9) * H) },
+        },
+      ],
+    });
+  }
 
   // ── Plate ────────────────────────────────────────────────────────────────
   const body: PortraitNode[] = [
@@ -254,46 +338,34 @@ export function portraitDrawing(
   ];
 
   if (detail === 'full') {
-    // The form, twice: a blurred mass, then a tighter highlight edge over it.
-    const d = blobPath(spec.formPoints, W, H);
-    body.push({
-      tag: 'path',
-      attrs: { d, fill: `url(#${id}f)`, filter: `url(#${id}b)`, opacity: '0.9' },
-    });
-    body.push({
-      tag: 'path',
-      attrs: {
-        d: blobPath(scalePoints(spec.formPoints, spec.formX, spec.formY, 0.72), W, H),
-        fill: 'none',
-        stroke: `rgba(${INK},0.10)`,
-        'stroke-width': r2(Math.max(0.6, W * 0.004)),
-      },
-    });
+    const cx = spec.formX * W;
+    const haloR = spec.formR * W * 2.2;
+    const haloY = (spec.formY - spec.formR * 1.5) * H;
 
-    // Engine turning. Concentric hairlines struck through the plate at an
-    // angle — the texture of a banknote or a watch dial, at the threshold of
-    // visibility. It is what stops the gradient reading as a CSS background.
+    // Engine turning first, so the form occludes it: concentric hairlines
+    // struck through the plate at an angle. The texture of a banknote or a
+    // watch dial, at the threshold of visibility — it is what stops the
+    // gradient reading as a CSS background.
     const arcs: PortraitNode[] = [];
     for (let i = 0; i < spec.guillocheRings; i++) {
       const t = (i + 1) / (spec.guillocheRings + 1);
       arcs.push({
         tag: 'ellipse',
         attrs: {
-          cx: r2(spec.formX * W),
-          cy: r2(spec.formY * H),
-          rx: r2(spec.formR * W * (0.45 + t * 1.5)),
-          ry: r2(spec.formR * H * (0.4 + t * 1.34)),
+          cx: r2(cx),
+          cy: r2(haloY),
+          rx: r2(haloR * (0.5 + t * 1.35)),
+          ry: r2(haloR * (0.46 + t * 1.3)),
           fill: 'none',
-          stroke: `rgba(${INK},${r2(0.05 - t * 0.028)})`,
+          stroke: `rgba(${INK},${r2(0.07 - t * 0.04)})`,
           'stroke-width': 0.6,
         },
       });
     }
+    body.push({ tag: 'rect', attrs: { x: 0, y: 0, width: W, height: H, fill: `url(#${id}e)` } });
     body.push({
       tag: 'g',
-      attrs: {
-        transform: `rotate(${spec.guillocheAngle} ${r2(spec.formX * W)} ${r2(spec.formY * H)})`,
-      },
+      attrs: { transform: `rotate(${spec.guillocheAngle} ${r2(cx)} ${r2(haloY)})` },
       children: arcs,
     });
 
@@ -305,7 +377,39 @@ export function portraitDrawing(
         y: r2(spec.horizonY * H),
         width: W,
         height: 1,
-        fill: `rgba(${BRASS},0.16)`,
+        fill: `rgba(${BRASS},0.14)`,
+      },
+    });
+
+    // The halo, then the mass in front of it.
+    body.push({
+      tag: 'ellipse',
+      attrs: {
+        cx: r2(cx),
+        cy: r2(haloY),
+        rx: r2(haloR),
+        ry: r2(haloR),
+        fill: `url(#${id}h)`,
+      },
+    });
+
+    const d = blobPath(spec.formPoints, W, H);
+    body.push({
+      tag: 'path',
+      attrs: { d, fill: `url(#${id}f)`, filter: `url(#${id}b)` },
+    });
+    // Rim light along the lit edge. A stroke on the same path, softened, and
+    // masked to the top half so it reads as light catching an edge rather than
+    // an outline drawn around a shape.
+    body.push({
+      tag: 'path',
+      attrs: {
+        d,
+        fill: 'none',
+        stroke: `rgba(${INK},0.17)`,
+        'stroke-width': r2(Math.max(0.8, W * 0.005)),
+        filter: `url(#${id}s)`,
+        'clip-path': `url(#${id}t)`,
       },
     });
 
@@ -383,40 +487,56 @@ export function portraitDrawing(
 
   // ── Monogram ─────────────────────────────────────────────────────────────
   const initials = initialsFrom(name);
-  const fontSize = shape === 'panel' ? Math.max(11, W * 0.13) : W * 0.34;
-  const mono: PortraitNode =
-    shape === 'panel'
-      ? {
-          tag: 'text',
-          attrs: {
-            x: r2(W * 0.5),
-            y: r2(H * 0.865),
-            'text-anchor': 'middle',
-            fill: spec.monogram,
-            'font-family': SERIF,
-            'font-size': r2(fontSize),
-            'letter-spacing': r2(fontSize * 0.14),
-          },
-          text: initials,
-        }
-      : {
-          tag: 'text',
-          attrs: {
-            x: '50%',
-            y: '50%',
-            'text-anchor': 'middle',
-            'dominant-baseline': 'central',
-            fill: spec.monogram,
-            'font-family': SERIF,
-            'font-size': r2(fontSize),
-            'letter-spacing': r2(W * 0.012),
-          },
-          text: initials,
-        };
+  const fontSize = shape === 'panel' ? Math.max(11, W * 0.115) : W * 0.34;
+  const caption: PortraitNode[] = [];
+
+  if (shape === 'panel') {
+    // Set like a plate caption in a catalogue: a hairline, then the monogram
+    // beneath it at the left margin. Centring it would put type over the
+    // brightest part of the form, which is the one place it cannot go.
+    const capY = H - Math.max(14, H * 0.085);
+    caption.push({
+      tag: 'rect',
+      attrs: {
+        x: r2(W * 0.09),
+        y: r2(capY - fontSize * 1.15),
+        width: r2(Math.max(18, W * 0.17)),
+        height: 1,
+        fill: `rgba(${BRASS},0.55)`,
+      },
+    });
+    caption.push({
+      tag: 'text',
+      attrs: {
+        x: r2(W * 0.09),
+        y: r2(capY),
+        fill: spec.monogram,
+        'font-family': SERIF,
+        'font-size': r2(fontSize),
+        'letter-spacing': r2(fontSize * 0.16),
+      },
+      text: initials,
+    });
+  } else {
+    caption.push({
+      tag: 'text',
+      attrs: {
+        x: '50%',
+        y: '50%',
+        'text-anchor': 'middle',
+        'dominant-baseline': 'central',
+        fill: spec.monogram,
+        'font-family': SERIF,
+        'font-size': r2(fontSize),
+        'letter-spacing': r2(W * 0.012),
+      },
+      text: initials,
+    });
+  }
 
   const nodes: PortraitNode[] = [
     { tag: 'defs', attrs: {}, children: defs },
-    { tag: 'g', attrs: { 'clip-path': `url(#${id}c)` }, children: [...body, mono] },
+    { tag: 'g', attrs: { 'clip-path': `url(#${id}c)` }, children: [...body, ...caption] },
     ...frame,
   ];
 

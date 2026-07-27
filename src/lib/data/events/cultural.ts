@@ -143,6 +143,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 30000, currency: 'USD' },
     accessNote:
       'The Ballo del Doge and the Palazzo Pisani Moretta dinners release seats in October and are gone by November; a bespoke costume from Atelier Nicolao or Antonia Sautter needs three months and two fittings',
+    bookingLeadDays: 120,
     venues: [
       'Piazza San Marco',
       'Palazzo Pisani Moretta',
@@ -190,6 +191,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 800, max: 3500, currency: 'USD' },
     accessNote:
       'Ticketed and capped at roughly 20,000 since 2013 — buy from the Buñol ayuntamiento’s official vendor; the balconies over Calle Cid belong to residents and are lent, not sold',
+    bookingLeadDays: 60,
     venues: ['Plaza del Pueblo', 'Calle Cid', 'Buñol town centre'],
     nearestJetPort: LEVC,
     description:
@@ -324,6 +326,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 10000, max: 40000, currency: 'USD' },
     accessNote:
       'Camarote boxes at the Sambadrome are sold as hospitality packages from October — Camarote Nº1 and the Rio Samba Concept are the two that matter; a costume slot inside a school’s wing is bought directly from the quadra and rehearsed',
+    bookingLeadDays: 365,
     venues: [
       'Sambódromo Marquês de Sapucaí',
       'Cidade do Samba',
@@ -411,6 +414,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3000, max: 12000, currency: 'USD' },
     accessNote:
       'EMUFEC sells numbered grandstand seats in the Sacsayhuamán esplanade from around March and the good blocks go early; the hillside above the ruins is free but you are standing from mid-morning',
+    bookingLeadDays: 120,
     venues: [
       'Sacsayhuamán esplanade',
       'Qorikancha',
@@ -455,6 +459,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 2500, max: 9000, currency: 'USD' },
     accessNote:
       'Acto Central tickets for the Teatro Griego Frank Romero Day go on sale in January; the useful invitations are the private bodega lunches — Catena Zapata, Zuccardi, Cheval des Andes — which come through your importer or the hotel’s wine director',
+    bookingLeadDays: 90,
     venues: [
       'Teatro Griego Frank Romero Day',
       'Parque General San Martín',
@@ -545,6 +550,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3000, max: 12000, currency: 'USD' },
     accessNote:
       'Entirely open — no ticket exists. The practical constraint is a driver and fixer who knows the Banke Bihari and Barsana temple timings, plus a car staged outside the old town, because the lanes are impassable from mid-morning',
+    bookingLeadDays: 60,
     venues: [
       'Banke Bihari Temple, Vrindavan',
       'Radha Rani Temple, Barsana',
@@ -632,6 +638,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 6000, max: 18000, currency: 'USD' },
     accessNote:
       'Bhutan requires a licensed operator and a $100 per-night Sustainable Development Fee on top of the package; the courtyard is public but a floor position for the pre-dawn thongdrel unfurling on the final morning needs a guide with standing at the dzong',
+    bookingLeadDays: 120,
     venues: [
       'Rinpung Dzong courtyard',
       'Deyangkha open ground',
@@ -680,6 +687,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3000, max: 12000, currency: 'USD' },
     accessNote:
       'The mountain is free to walk. The scarce thing is a room on it — the dozen ryokan in Yoshinoyama and the shukubo temple lodgings at Chikurin-in take bookings a year out and will not hold a peak-week date without a deposit',
+    bookingLeadDays: 365,
     venues: [
       'Yoshinoyama (Shimo, Naka, Kami and Oku Senbon)',
       'Kinpusen-ji',
@@ -767,6 +775,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 2000, max: 7000, currency: 'USD' },
     accessNote:
       'Reserved seats in the four paid enbujo arenas are sold by the Tokushima organising committee from late June and the S-seats on Minami-Uchimachi go first; dancing in a ren yourself requires an invitation from that troupe, usually via a Tokushima business connection',
+    bookingLeadDays: 60,
     venues: [
       'Minami-Uchimachi enbujo',
       'Ryogoku-bashi enbujo',
@@ -901,6 +910,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 3500, max: 12000, currency: 'USD' },
     accessNote:
       'No tickets exist; access is about position. The raised walls around Fasilides Bath fill before dawn, and the workable route is a guide who arranges a rooftop or a spot with one of the Gondar parishes the evening before, during the Ketera procession',
+    bookingLeadDays: 90,
     venues: [
       'Fasilides Bath',
       'Fasil Ghebbi royal enclosure',
@@ -944,6 +954,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 4000, max: 15000, currency: 'USD' },
     accessNote:
       'Walking the mazayna rings is free and unrestricted; the auction majlis, the falconry side events and the owners’ tents run entirely on personal invitation from an Emirati host, arranged through the festival’s protocol office for named guests',
+    bookingLeadDays: 60,
     venues: [
       'Al Dhafra Festival grounds, Madinat Zayed',
       'Mazayna judging rings',
@@ -988,6 +999,7 @@ export const CULTURAL_EVENTS: WorldEvent[] = [
     estimatedSpend: { min: 5000, max: 22000, currency: 'USD' },
     accessNote:
       'You play mas by registering with a band — Tribe, Yuma and Lost Tribe open registration the previous August and the good sections sell out in hours. Costume, drinks and security come with the package. Hotels commit a year out; most serious visitors rent a house in Maraval or Goodwood Park.',
+    bookingLeadDays: 300,
     venues: ['Queen’s Park Savannah', 'Ariapita Avenue', 'Downtown Port of Spain'],
     nearestJetPort: TTPP,
     description:
