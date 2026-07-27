@@ -243,17 +243,7 @@ function ProfileBody({ member, onClose }: ProfileBodyProps) {
               </>
             }
           />
-          {(member.age || member.pronouns) && (
-            <Fact
-              label="Age"
-              value={
-                <>
-                  {member.age ?? '—'}
-                  {member.pronouns && <span className="ml-2 text-ink-faint">{member.pronouns}</span>}
-                </>
-              }
-            />
-          )}
+          {member.age ? <Fact label="Age" value={member.age} /> : null}
           {member.languages?.length ? (
             <Fact label="Speaks" value={member.languages.join(', ')} />
           ) : null}
